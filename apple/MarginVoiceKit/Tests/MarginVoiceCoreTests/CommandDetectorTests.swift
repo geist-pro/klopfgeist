@@ -87,7 +87,7 @@ struct CommandDetectorTests {
       } else if let t = step.text {
         outcomes = detector.hypothesis(.init(text: t.text, start: t.start, end: t.end, isFinal: step.final ?? false), now: step.at, context: context)
       } else if let active = step.speech {
-        detector.speech(active: active)
+        detector.speech(active: active, at: step.at)
       } else if let time = step.forget {
         detector.forget(before: time)
       } else if step.reset == true {

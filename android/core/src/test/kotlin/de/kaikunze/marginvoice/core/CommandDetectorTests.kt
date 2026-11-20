@@ -77,7 +77,7 @@ class CommandDetectorTests {
                 } else if (t != null) {
                     outcomes = detector.hypothesis(Hypothesis.of(t.text, t.start, t.end, step.isFinal ?: false), now = step.at, context = context)
                 } else if (step.speech != null) {
-                    detector.speech(step.speech)
+                    detector.speech(step.speech, step.at)
                 } else if (step.forget != null) {
                     detector.forget(before = step.forget)
                 } else if (step.reset == true) {

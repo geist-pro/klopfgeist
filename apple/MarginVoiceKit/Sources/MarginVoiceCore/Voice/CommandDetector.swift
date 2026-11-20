@@ -78,16 +78,34 @@ public struct CommandDetector: Sendable {
     public var maximumDuration: Double
     /// The same command again within this time is the same command.
     public var refractory: Double
+    /// A command known only from a guess (not a final result) that speech audibly went on
+    /// after waits for the final words. For comments: a recognizer that reports the start of
+    /// a sentence first ("we should continue…") would otherwise end the comment inside it.
+    public var waitsForFinalWords: Bool
+
+    private enum CodingKeys: String, CodingKey { case pauseBefore, settle, maximumHold, maximumDuration, refractory, waitsForFinalWords }
+
+    /// Policies written before `waitsForFinalWords` existed still load.
+    public init(from decoder: Decoder) throws {
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      pauseBefore = try c.decode(Double.self, forKey: .pauseBefore)
+      settle = try c.decode(Double.self, forKey: .settle)
+      maximumHold = try c.decode(Double.self, forKey: .maximumHold)
+      maximumDuration = try c.decode(Double.self, forKey: .maximumDuration)
+      refractory = try c.decode(Double.self, forKey: .refractory)
+      waitsForFinalWords = try c.decodeIfPresent(Bool.self, forKey: .waitsForFinalWords) ?? false
+    }
 
     public init(
       pauseBefore: Double, settle: Double, maximumHold: Double = 1.2,
-      maximumDuration: Double = 2, refractory: Double = 1
+      maximumDuration: Double = 2, refractory: Double = 1, waitsForFinalWords: Bool = false
     ) {
       self.pauseBefore = pauseBefore
       self.settle = settle
       self.maximumHold = maximumHold
       self.maximumDuration = maximumDuration
       self.refractory = refractory
+      self.waitsForFinalWords = waitsForFinalWords
     }
 
     /// The book plays or is paused: quick, since "stop" should land on the sentence.
@@ -96,7 +114,7 @@ public struct CommandDetector: Sendable {
     /// command, so the silence after it is longer. The pause before it stays short:
     /// people close a comment with a natural sentence break ("This works. Continue."),
     /// about a third of a second in the field.
-    public static let recording = Policy(pauseBefore: 0.3, settle: 0.6)
+    public static let recording = Policy(pauseBefore: 0.3, settle: 0.6, waitsForFinalWords: true)
     /// The book is on a loudspeaker next to the microphone: what remains of it keeps
     /// the energy detector busy, so it is waited for only briefly.
     public static let listeningOverSpeaker = Policy(pauseBefore: 0.3, settle: 0.3, maximumHold: 0.6)
@@ -164,6 +182,8 @@ public struct CommandDetector: Sendable {
   private var decidedUntil = -Double.infinity
   private var pending: Pending?
   private var speechActive = false
+  /// When the energy detector last stopped hearing speech (microphone time).
+  private var speechEndedAt = -Double.infinity
   private var lastFire: (command: VoiceCommand, at: Double)?
 
   private struct Pending: Sendable {
@@ -176,6 +196,8 @@ public struct CommandDetector: Sendable {
     var duration: Double
     /// When the recognizer first reported the phrase as it stands.
     var seen: Double
+    /// Some of its words are still the recognizer's guess: more words may follow in the final result.
+    var isGuess = false
   }
 
   private struct Token {
@@ -183,8 +205,11 @@ public struct CommandDetector: Sendable {
     let start: Double
     let end: Double
     let isVolatile: Bool
+    let isGuess: Bool
   }
 
+  /// Speech heard this long past a command's end means more was said (the energy detector's release is shorter).
+  private static let speechTail: Double = 0.4
   /// How long heard words are kept for the pause before a command.
   private static let memory: Double = 12
   /// How long a command timed only approximately waits for final words before a
@@ -205,6 +230,7 @@ public struct CommandDetector: Sendable {
     decidedUntil = -.infinity
     pending = nil
     speechActive = false
+    speechEndedAt = -.infinity
     lastFire = nil
   }
 
@@ -214,9 +240,10 @@ public struct CommandDetector: Sendable {
     if let p = pending, p.candidate.start < time { pending = nil }
   }
 
-  /// The energy detector hears speech (or stopped hearing it).
-  public mutating func speech(active: Bool) {
+  /// The energy detector hears speech (or stopped hearing it) at microphone time `time`.
+  public mutating func speech(active: Bool, at time: Double? = nil) {
     speechActive = active
+    if !active, let time { speechEndedAt = time }
   }
 
   /// A recognizer result arrived at microphone time `now`.
@@ -261,14 +288,19 @@ public struct CommandDetector: Sendable {
       p.pauseBefore = found.pauseBefore
       p.isVolatile = found.isVolatile
       p.duration = found.duration
+      p.isGuess = found.isGuess
       pending = p
     } else {
       pending = Pending(
-        candidate: found.candidate, pauseBefore: found.pauseBefore, isVolatile: found.isVolatile, duration: found.duration, seen: now)
+        candidate: found.candidate, pauseBefore: found.pauseBefore, isVolatile: found.isVolatile, duration: found.duration, seen: now,
+        isGuess: found.isGuess)
     }
     guard let p = pending, isSettled(p, now: now, policy: context.policy) else { return outcomes }
 
     let c = p.candidate
+    // a guess that speech went on after: its final words decide whether it was the end of what was said
+    let spokenOn = speechActive || speechEndedAt > c.end + Self.speechTail
+    if context.policy.waitsForFinalWords, p.isGuess, spokenOn, now - p.seen < Self.finalWait { return outcomes }
     // the command just acted on, said again: whatever its timing, it is that one
     let isDuplicate = lastFire.map { $0.command == c.command && c.start - $0.at < context.policy.refractory } ?? false
     let tooLong = p.duration > context.policy.maximumDuration
@@ -311,16 +343,16 @@ public struct CommandDetector: Sendable {
   }
 
   /// The command phrase at the very end of what was heard, if there is one.
-  private func trailingCommand(allowed: Set<VoiceCommand>) -> (candidate: Candidate, pauseBefore: Double, isVolatile: Bool, duration: Double)? {
+  private func trailingCommand(allowed: Set<VoiceCommand>) -> (candidate: Candidate, pauseBefore: Double, isVolatile: Bool, duration: Double, isGuess: Bool)? {
     var spoken: [Token] = []
-    let heard = finalWords.map { ($0, false) } + volatileWords.map { ($0, volatileApproximate) }
-    for (word, isVolatile) in heard.sorted(by: { $0.0.start < $1.0.start }) {
+    let heard = finalWords.map { ($0, false, false) } + volatileWords.map { ($0, volatileApproximate, true) }
+    for (word, isVolatile, isGuess) in heard.sorted(by: { $0.0.start < $1.0.start }) {
       let parts = TextSegmentation.tokens(word.text)
       // a recognizer run of several words: spread them over the run
       let step = (word.end - word.start) / Double(max(1, parts.count))
       for (i, part) in parts.enumerated() where !VoiceCommand.fillers.contains(part) {
         spoken.append(
-          Token(text: part, start: word.start + Double(i) * step, end: word.start + Double(i + 1) * step, isVolatile: isVolatile))
+          Token(text: part, start: word.start + Double(i) * step, end: word.start + Double(i + 1) * step, isVolatile: isVolatile, isGuess: isGuess))
       }
     }
     for n in [2, 1] where spoken.count >= n {
@@ -342,8 +374,9 @@ public struct CommandDetector: Sendable {
       let start = spoken[head].start
       let pause = head > 0 ? start - spoken[head - 1].end : .infinity
       let isVolatile = spoken[head...].contains(where: \.isVolatile)
+      let isGuess = spoken[head...].contains(where: \.isGuess)
       let end = spoken[spoken.count - 1].end
-      return (Candidate(command: command, text: text, start: start, end: end), pause, isVolatile, end - spoken[first].start)
+      return (Candidate(command: command, text: text, start: start, end: end), pause, isVolatile, end - spoken[first].start, isGuess)
     }
     return nil
   }

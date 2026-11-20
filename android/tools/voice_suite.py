@@ -18,7 +18,8 @@ app's command log (logcat tag ReviewSession): "“stop” → stop at 1:23". A p
 is reported as that command ("slower" for "stop"), which is worse than not heard.
 
 Needs: macOS (`say`), adb, a debug build installed, a book in the library, the phone near the laptop
-with media volume up. The phrases come from core/…/VoiceCommand.kt: keep PHRASES in step with it.
+with media volume up. The phrases are those of the Android recognizer (VoskResults.grammar: VoiceCommand
+without the phrases that contain a word the model mishears): keep PHRASES in step with it.
 Writes results.csv and summary.md into --out and prints the summary.
 """
 import argparse, csv, pathlib, re, subprocess, time
@@ -28,9 +29,9 @@ ACTIVITY = f"{PKG}/de.kaikunze.marginvoice.MainActivity"
 PHRASES = {
     "en": {
         "stop": ["stop", "note", "comment"],
-        "resume": ["continue", "go on", "resume", "play"],
-        "cancel": ["cancel", "discard", "delete that"],
-        "back": ["back", "go back", "rewind"],
+        "resume": ["continue", "resume", "play"],
+        "cancel": ["cancel", "discard"],
+        "back": ["back", "rewind"],
         "again": ["again", "repeat"],
         "mark": ["bookmark", "mark", "bookmark this", "mark this"],
         "faster": ["faster"],
@@ -40,7 +41,7 @@ PHRASES = {
         "stop": ["stopp", "Notiz", "Kommentar"],
         "resume": ["weiter", "weitermachen", "fortsetzen"],
         "cancel": ["abbrechen", "verwerfen", "löschen"],
-        "back": ["zurück", "zurückspulen"],
+        "back": ["zurück"],
         "again": ["nochmal", "wiederholen"],
         "mark": ["Lesezeichen", "Markierung", "markieren", "merken"],
         "faster": ["schneller"],
@@ -68,6 +69,13 @@ def key(code, wait=0.6):
     time.sleep(wait)
 
 
+def playing():
+    """Whether Klopfgeist's media session reports playback."""
+    dump = adb("shell", "dumpsys", "media_session")
+    mine = dump.split(f"SUMMARY: package={PKG}", 1)
+    return len(mine) > 1 and "state=PLAYING" in mine[1].split("SUMMARY:", 1)[0]
+
+
 def say(voice, volume, text):
     subprocess.run(["say", "-v", voice, f"[[volm {volume}]] {text}"], check=False)
 
@@ -86,6 +94,8 @@ def trial(state, voice, volume, phrase, language):
     key(PAUSE, 0.3)
     if state == "playing":
         key(PLAY, 4.0)
+        if not playing():
+            return [], [("harness", "the book did not start playing")], "", ""
     elif state == "paused":
         key(PLAY, 1.5); key(PAUSE, 1.0)
     elif state in ("recording", "after comment", "negative"):
@@ -115,6 +125,7 @@ def main():
     ap.add_argument("--volumes", default="0.4")
     ap.add_argument("--only", help="commands to run, e.g. stop,resume,negative")
     ap.add_argument("--out", default="build/voice-suite")
+    ap.add_argument("--traces", action="store_true", help="debug builds: pull the session trace after every trial that went wrong")
     a = ap.parse_args()
     lang = a.language
     voices = a.voices.split(",") if a.voices else VOICES[lang]
@@ -122,8 +133,13 @@ def main():
     only = set(a.only.split(",")) if a.only else None
 
     adb("shell", "am", "force-stop", PKG)
-    adb("shell", "am", "start", "-n", ACTIVITY, "--ei", "open", "0", "--es", "commandLanguage", lang)
-    time.sleep(5)
+    adb("shell", "am", "start", "-n", ACTIVITY, "--ei", "open", "0", "--ez", "play", "true", "--es", "commandLanguage", lang)
+    time.sleep(9)
+    # The media keys only reach the app once it has played: without this check every "playing" trial
+    # would run against a silent, paused book and pass far too easily.
+    if not playing():
+        raise SystemExit("the book is not playing: open a book and press Play once, then run the suite again")
+    key(PAUSE)
 
     plan = []  # (expected command or None, state, phrase)
     for command, phrases in PHRASES[lang].items():
@@ -141,6 +157,7 @@ def main():
         plan = [p for p in plan if (p[0] or "negative") in only]
 
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
     rows = []
     for voice in voices:
         for volume in volumes:
@@ -153,6 +170,12 @@ def main():
                     verdict = "ok" if got == expected else (f"WRONG {got}" if got else "missed")
                 why = "; ".join(f"{t}: {r}" for t, r in ignored)
                 heard = commands[-1][0] if commands else ""
+                if a.traces and verdict != "ok":
+                    # what the recognizer reported and what the detector decided, for this trial's last seconds
+                    adb("shell", "am", "start", "-n", ACTIVITY, "--ez", "trace", "true")
+                    time.sleep(0.8)
+                    name = re.sub(r"[^A-Za-z0-9]+", "-", f"{lang}-{voice}-{state}-{phrase}").strip("-")
+                    adb("pull", f"/sdcard/Android/data/{PKG}/files/session.trace.jsonl", str(out / f"trace-{name}.jsonl"))
                 rows.append([lang, voice, volume, expected or "none", state, phrase, verdict, got, heard, level, latency, why])
                 print(f"{voice:24} {volume:4} {state:14} {phrase:34} {verdict:12} {level:>4} dBFS {latency}", flush=True)
     with open(out / f"results-{lang}.csv", "w", newline="") as f:

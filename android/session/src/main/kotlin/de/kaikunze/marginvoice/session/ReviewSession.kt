@@ -507,7 +507,7 @@ class ReviewSession(
             }
             is CaptureEvent.Speech -> {
                 trace.record(TraceEvent.Kind.Speech(event.active, event.micTime), now())
-                detector.speech(event.active)
+                detector.speech(event.active, event.micTime)
                 lastSpeechEvidence = max(lastSpeechEvidence, event.micTime)
                 if (event.active) {
                     // a sample right at speech start, so a "stop" just after a restart has one too

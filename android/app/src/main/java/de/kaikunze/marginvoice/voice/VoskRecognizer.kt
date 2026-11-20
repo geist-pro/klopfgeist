@@ -108,7 +108,7 @@ class VoskRecognizer {
      * recognizer could not be built.
      */
     fun start(
-        model: Model, sampleRate: Int, frontEnd: RecognizerFrontEnd,
+        model: Model, language: VoiceCommand.Language, sampleRate: Int, frontEnd: RecognizerFrontEnd,
         onHypothesis: (Hypothesis) -> Unit, onEvidence: (String, Boolean) -> Unit, onFailed: (String) -> Unit,
     ) {
         stop()
@@ -119,7 +119,7 @@ class VoskRecognizer {
             try {
                 // tens to hundreds of milliseconds: here, not on the main or the microphone thread.
                 // Buffers fed meanwhile queue up behind this and are all recognized.
-                val recognizer = Recognizer(model, sampleRate.toFloat(), VoskResults.grammar())
+                val recognizer = Recognizer(model, sampleRate.toFloat(), VoskResults.grammar(language))
                 recognizer.setWords(true)
                 recognizer.setPartialWords(true)
                 r.recognizer = recognizer

@@ -117,7 +117,7 @@ public enum TraceReplay {
       case .speech(let active, let time):
         advance(to: time)
         offset = time - event.t
-        detector.speech(active: active)
+        detector.speech(active: active, at: time)
       case .mode(let m):
         mode = m
         if m == "recording" { detector.forget(before: mic) }

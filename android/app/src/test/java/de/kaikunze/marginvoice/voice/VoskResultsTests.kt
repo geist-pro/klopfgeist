@@ -44,12 +44,20 @@ class VoskResultsTests {
         assertNull(VoskResults.hypothesis("[]", 0.0))
     }
 
-    @Test fun theGrammarHoldsEveryCommandPhraseOfBothLanguagesAsTheModelsSpellThem() {
-        val grammar = VoskResults.grammar()
-        for (word in listOf("stop", "continue", "go back", "weiter", "lesezeichen setzen", "zurück", "löschen", "[unk]", "please", "bitte")) {
-            assertTrue(word, grammar.contains("\"$word\""))
-        }
-        assertTrue("umlauts are spelled out for the model", !grammar.contains("\"zuruck\""))
+    @Test fun theGrammarHoldsTheCommandPhrasesOfOneLanguageAsTheModelSpellsThem() {
+        val english = VoskResults.grammar(VoiceCommand.Language.ENGLISH)
+        for (word in listOf("stop", "continue", "bookmark", "[unk]", "please")) assertTrue(word, english.contains("\"$word\""))
+        // phrases whose extra word the model hears instead of a command are left out; their one-word forms stay
+        for (word in listOf("go on", "go back", "delete that", "bookmark that")) assertTrue(word, !english.contains("\"$word\""))
+        for (word in listOf("back", "rewind", "cancel", "discard", "mark", "bookmark this", "mark this")) assertTrue(word, english.contains("\"$word\""))
+        // the other language's words would only be something to mishear ("mark" as "mal")
+        for (word in listOf("weiter", "nochmal", "bitte")) assertTrue(word, !english.contains("\"$word\""))
+
+        val german = VoskResults.grammar(VoiceCommand.Language.GERMAN)
+        for (word in listOf("stopp", "weiter", "zurück", "löschen", "[unk]", "bitte")) assertTrue(word, german.contains("\"$word\""))
+        assertTrue("umlauts are spelled out for the model", !german.contains("\"zuruck\""))
+        assertTrue(!german.contains("\"continue\""))
+        assertTrue("the German model does not know the word", !german.contains("zurückspulen"))
     }
 
     @Test fun aConvertedResultIsACommandForTheDetector() {

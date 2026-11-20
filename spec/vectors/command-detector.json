@@ -1,5 +1,5 @@
 {
-  "description": "CommandDetector conformance. Both cores (Swift MarginVoiceCore, Kotlin :core) run every case. A step happens at microphone time `at` and is one of: words (+final; +approximate when a volatile guess is timed over the whole run, as SpeechAnalyzer does), text (a result timed as a whole), speech (energy detector), tick, forget, reset. `expect` lists the outcomes of that step in order (default: none). Contexts: policy listening | recording | listeningOverSpeaker; allowed all | recording; bookText optional.",
+  "description": "CommandDetector conformance. Both cores (Swift MarginVoiceCore, Kotlin :core) run every case. A step happens at microphone time `at` and is one of: words (+final; +approximate when a volatile guess is timed over the whole run, as SpeechAnalyzer does), text (a result timed as a whole), speech (energy detector; `at` is when speech started or ended), tick, forget, reset. `expect` lists the outcomes of that step in order (default: none). Contexts: policy listening | recording | listeningOverSpeaker; allowed all | recording; bookText optional.",
   "cases": [
     {
       "name": "stop said five times in a row fires once",
@@ -276,6 +276,56 @@
         {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
         {"at": 10.5, "words": [["top", 10.0, 10.3]]},
         {"at": 11.5, "tick": true}
+      ]
+    },
+    {
+      "name": "in a comment, a guessed command that speech went on after waits for the final words",
+      "why": "Device trace (Galaxy A16, speaker, 2026-11-20): “we should continue with this design”, spoken into a comment. Vosk first reported only “resume continue” (0.4 s after the sentence had ended), the settle time passed, the comment was saved, and 0.3 s later the final words “… this this on” arrived. The energy detector had heard speech until 0.8 s after “continue”.",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 8.1, "speech": true},
+        {"at": 9.68, "speech": false},
+        {"at": 10.08, "words": [["resume", 8.07, 8.46], ["continue", 8.49, 8.91]]},
+        {"at": 10.5, "tick": true},
+        {"at": 10.8, "tick": true},
+        {"at": 11.1, "final": true, "words": [["resume", 8.07, 8.46], ["continue", 8.49, 9.03], ["this", 9.12, 9.3], ["this", 9.3, 9.54], ["on", 9.54, 9.96]], "expect": [{"reject": "speechContinued", "text": "continue"}]},
+        {"at": 12.0, "tick": true}
+      ]
+    },
+    {
+      "name": "in a comment, a guessed command that speech ended with is not held",
+      "why": "The speech tail the wait looks for is 0.4 s past the command; the energy detector's own release time stays below that.",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 8.0, "speech": true},
+        {"at": 9.2, "speech": false},
+        {"at": 9.3, "words": [["unclear", 8.0, 8.4], ["continue", 8.75, 9.0]]},
+        {"at": 9.7, "tick": true},
+        {"at": 9.95, "tick": true, "expect": [{"fire": "resume", "start": 8.75, "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "in a comment, the wait for final words ends by itself",
+      "why": "A recognizer that never finalizes must not swallow the command: after 2.5 s it is decided on what is known.",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 8.1, "speech": true},
+        {"at": 9.68, "speech": false},
+        {"at": 10.08, "words": [["resume", 8.07, 8.46], ["continue", 8.49, 8.91]]},
+        {"at": 11.0, "tick": true},
+        {"at": 12.5, "tick": true},
+        {"at": 12.6, "tick": true, "expect": [{"fire": "resume", "start": 8.07, "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "while the book plays, speech after a guessed command does not hold it",
+      "why": "“stop” should land on the sentence, and over a loudspeaker the energy detector hears the book all the time: the wait is for comments only.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 8.1, "speech": true},
+        {"at": 9.68, "speech": false},
+        {"at": 10.08, "words": [["stop", 8.49, 8.91]]},
+        {"at": 10.4, "tick": true, "expect": [{"fire": "stop", "start": 8.49, "text": "stop"}]}
       ]
     }
   ]

@@ -179,7 +179,7 @@ object TraceReplay {
                 is TraceEvent.Kind.Speech -> {
                     advance(k.mic)
                     offset = k.mic - event.t
-                    detector.speech(k.active)
+                    detector.speech(k.active, k.mic)
                 }
                 is TraceEvent.Kind.Mode -> {
                     mode = k.mode

@@ -60,6 +60,18 @@ next failure on a real headset arrives as data.
    (microphone time mapped through recent clock samples, minus the route latency).
 4. `ReviewMachine` returns effects; the session performs them through the ports.
 
+Two rules came out of the first run of `android/tools/voice_suite.py` on a phone (2026-11-20), where
+the traces of the failed trials showed what had been heard:
+
+- **In a comment, a guessed command waits for the final words** when the energy detector heard speech
+  go on for more than 0.4 s after it (`Policy.waitsForFinalWords`). Vosk reported "resume continue" for
+  "we should continue with this design" and delivered the rest 0.3 s after the settle time.
+- **The Vosk grammar holds one language, and no phrase with a word the model mishears**
+  (`VoskResults.grammar`). Vosk takes the phrase list as a bag of words: "stop" came back as "go"
+  (from "go on"), "back" as "that" (from "delete that"), and the English model heard "mark" as the
+  German "mal". On Android "go on", "go back", "delete that" and "bookmark that" are therefore not
+  commands; their one-word forms are. "zurückspulen" is out too: the German model never returned it.
+
 ## The audio plan
 
 `AudioPlan.make(needs, route)` says which session category, whether to mix with other apps,

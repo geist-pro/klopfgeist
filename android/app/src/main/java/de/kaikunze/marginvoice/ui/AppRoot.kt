@@ -143,7 +143,6 @@ fun AppRoot(graph: AppGraph, requests: AppRequests, inbox: File, onPickAudiobook
     LaunchedEffect(requests.open, books.size) {
         val i = requests.open ?: return@LaunchedEffect
         val book = books.getOrNull(i) ?: books.firstOrNull() ?: return@LaunchedEffect
-        requests.open = null
         openBook(book)
         when (requests.show) {
             "notes" -> nav.push(Route.Comments(book.id))
@@ -153,8 +152,11 @@ fun AppRoot(graph: AppGraph, requests: AppRequests, inbox: File, onPickAudiobook
         }
         if (requests.play) {
             kotlinx.coroutines.delay(3000)
+            requests.play = false
             session.togglePlay()
         }
+        // last: clearing the request restarts this effect, which would cancel the wait above
+        requests.open = null
     }
     LaunchedEffect(requests.show) {
         when (requests.show) {

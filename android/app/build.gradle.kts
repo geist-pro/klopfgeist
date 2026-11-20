@@ -29,8 +29,8 @@ android {
         // Android 13: the speech recognizer takes audio from a file and biasing strings.
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Vosk ships native code for every ABI; phones are arm64, emulators x86_64.
         // The beta APK is phones only: -Pabi=arm64-v8a (tools/release-beta.sh).

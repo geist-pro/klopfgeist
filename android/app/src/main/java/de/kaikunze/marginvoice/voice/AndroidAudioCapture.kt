@@ -245,7 +245,7 @@ class AndroidAudioCapture(
     private fun startRecognizer(model: Model, language: VoiceCommand.Language) {
         val token = ++recognizerEpoch
         recognizer.start(
-            model, sampleRate, frontEnd,
+            model, language, sampleRate, frontEnd,
             onHypothesis = { h -> main.post { if (token == recognizerEpoch) onEvent?.invoke(CaptureEvent.Hypothesis(h)) } },
             onEvidence = { text, accepted -> main.post { if (token == recognizerEpoch) note(text, accepted) } },
             onFailed = { why -> main.post { if (token == recognizerEpoch) onEvent?.invoke(CaptureEvent.Failed(why)) } },

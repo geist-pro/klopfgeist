@@ -424,7 +424,7 @@ public final class ReviewSession {
       handle(detector.hypothesis(h, now: mic, context: detectorContext()))
     case .speech(let active, let micTime):
       trace.record(.speech(active: active, mic: micTime), at: now())
-      detector.speech(active: active)
+      detector.speech(active: active, at: micTime)
       lastSpeechEvidence = max(lastSpeechEvidence, micTime)
       if active {
         // a sample right at speech start, so a "stop" just after a restart has one too

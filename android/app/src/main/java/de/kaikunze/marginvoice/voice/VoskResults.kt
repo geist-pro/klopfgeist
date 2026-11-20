@@ -48,17 +48,36 @@ object VoskResults {
     private val spelled = mapOf("zuruck" to "zurück", "zuruckspulen" to "zurückspulen", "loschen" to "löschen")
 
     /**
-     * The recognizer's grammar: every phrase of both languages, so either language works
-     * whichever model listens, and "[unk]" for everything else. The grammar keeps a small
-     * model from hearing command words in ordinary speech; the words around a command
-     * arrive as "[unk]" with their times, which is all `CommandDetector` needs of them.
+     * The recognizer's grammar: the command phrases of the language that is listened for, and
+     * "[unk]" for everything else. The grammar keeps a small model from hearing command words in
+     * ordinary speech; the words around a command arrive as "[unk]" with their times, which is all
+     * `CommandDetector` needs of them.
+     *
+     * Only one language: Vosk takes the phrases as a word list, and every word in it is something
+     * another word can be mistaken for. With both languages in, the English model heard "mark" and
+     * "note" as the German "mal" (device traces, 2026-11-20).
      */
-    fun grammar(): String {
-        val phrases = VoiceCommand.Language.entries.flatMap { lang ->
-            VoiceCommand.phrases(lang).values.flatten().map { p -> p.split(' ').joinToString(" ") { spelled[it] ?: it } }
-        } + listOf("bitte", "please", UNKNOWN)
+    fun grammar(language: VoiceCommand.Language): String {
+        val phrases = VoiceCommand.phrases(language).values.flatten()
+            .filterNot { p -> p.split(' ').any { it in misheard } }
+            .map { p -> p.split(' ').joinToString(" ") { spelled[it] ?: it } } +
+            listOf(if (language == VoiceCommand.Language.GERMAN) "bitte" else "please", UNKNOWN)
         return JsonArray(phrases.distinct().map { JsonPrimitive(it) }).toString()
     }
+
+    /**
+     * Words that are no command on their own and that the small English model hears in place of one:
+     * "stop" and "slower" came back as "go", "back" and "faster" as "that" (device traces, 2026-11-20,
+     * 6 of 10 misses over a playing book). Phrases with these words ("go on", "go back", "delete that",
+     * "bookmark that") are left out of the grammar: each has one-word forms that stay.
+     *
+     * "zurückspulen" is left out because the small German model never returned it (0 of 12 trials); it
+     * came back as "zurück stopp" or as nothing. "zurück" stays.
+     *
+     * Tried and not kept: leaving out "mark", which "back" was heard as for three of six voices. "back"
+     * was then simply missed as often, and "slower" was heard as "note" more often.
+     */
+    val misheard = setOf("go", "that", "zuruckspulen")
 
     const val UNKNOWN = "[unk]"
 }

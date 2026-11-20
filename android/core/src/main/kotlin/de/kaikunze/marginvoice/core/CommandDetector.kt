@@ -81,6 +81,12 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
         val maximumDuration: Double = 2.0,
         /** The same command again within this time is the same command. */
         val refractory: Double = 1.0,
+        /**
+         * A command known only from a guess (not a final result) that speech audibly went on
+         * after waits for the final words. For comments: a recognizer that reports the start of
+         * a sentence first ("we should continue…") would otherwise end the comment inside it.
+         */
+        val waitsForFinalWords: Boolean = false,
     ) {
         companion object {
             /** The book plays or is paused: quick, since "stop" should land on the sentence. */
@@ -89,7 +95,7 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
              * A comment is being spoken: "continue" in the middle of a sentence is not a
              * command, so both pauses are longer.
              */
-            val recording = Policy(pauseBefore = 0.3, settle = 0.6)
+            val recording = Policy(pauseBefore = 0.3, settle = 0.6, waitsForFinalWords = true)
             /**
              * The book is on a loudspeaker next to the microphone: what remains of it keeps
              * the energy detector busy, so it is waited for only briefly.
@@ -146,11 +152,13 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
         val duration: Double,
         /** When the recognizer first reported the phrase as it stands. */
         val seen: Double,
+        /** Some of its words are still the recognizer's guess: more words may follow in the final result. */
+        val isGuess: Boolean = false,
     )
 
-    private class Token(val text: String, val start: Double, val end: Double, val isVolatile: Boolean)
+    private class Token(val text: String, val start: Double, val end: Double, val isVolatile: Boolean, val isGuess: Boolean)
 
-    private class Found(val candidate: Candidate, val pauseBefore: Double, val isVolatile: Boolean, val duration: Double)
+    private class Found(val candidate: Candidate, val pauseBefore: Double, val isVolatile: Boolean, val duration: Double, val isGuess: Boolean)
 
     private class Fired(val command: VoiceCommand, val at: Double)
 
@@ -164,6 +172,8 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
     private var decidedUntil = Double.NEGATIVE_INFINITY
     private var pending: Pending? = null
     private var speechActive = false
+    /** When the energy detector last stopped hearing speech (microphone time). */
+    private var speechEndedAt = Double.NEGATIVE_INFINITY
     private var lastFire: Fired? = null
 
     /** The microphone restarted (its timeline starts at zero again) or another book opened. */
@@ -174,6 +184,7 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
         decidedUntil = Double.NEGATIVE_INFINITY
         pending = null
         speechActive = false
+        speechEndedAt = Double.NEGATIVE_INFINITY
         lastFire = null
     }
 
@@ -183,9 +194,10 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
         pending?.let { if (it.candidate.start < before) pending = null }
     }
 
-    /** The energy detector hears speech (or stopped hearing it). */
-    fun speech(active: Boolean) {
+    /** The energy detector hears speech (or stopped hearing it) at microphone time `at`. */
+    fun speech(active: Boolean, at: Double? = null) {
         speechActive = active
+        if (!active && at != null) speechEndedAt = at
     }
 
     /** A recognizer result arrived at microphone time `now`. */
@@ -225,14 +237,17 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
         val p = if (waiting != null) {
             // the same command in a newer result: re-timed, or grown ("mark" → "mark this")
             val changed = found.candidate.end - waiting.candidate.end > 0.05 || found.candidate.text != waiting.candidate.text
-            Pending(found.candidate, found.pauseBefore, found.isVolatile, found.duration, if (changed) now else waiting.seen)
+            Pending(found.candidate, found.pauseBefore, found.isVolatile, found.duration, if (changed) now else waiting.seen, found.isGuess)
         } else {
-            Pending(found.candidate, found.pauseBefore, found.isVolatile, found.duration, now)
+            Pending(found.candidate, found.pauseBefore, found.isVolatile, found.duration, now, found.isGuess)
         }
         pending = p
         if (!isSettled(p, now, context.policy)) return outcomes
 
         val c = p.candidate
+        // a guess that speech went on after: its final words decide whether it was the end of what was said
+        val spokenOn = speechActive || speechEndedAt > c.end + SPEECH_TAIL
+        if (context.policy.waitsForFinalWords && p.isGuess && spokenOn && now - p.seen < FINAL_WAIT) return outcomes
         val last = lastFire
         // the command just acted on, said again: whatever its timing, it is that one
         val isDuplicate = last != null && last.command == c.command && c.start - last.at < context.policy.refractory
@@ -277,14 +292,14 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
     /** The command phrase at the very end of what was heard, if there is one. */
     private fun trailingCommand(allowed: Set<VoiceCommand>): Found? {
         val spoken = ArrayList<Token>()
-        val heard = finalWords.map { it to false } + volatileWords.map { it to volatileApproximate }
-        for ((word, isVolatile) in heard.sortedBy { it.first.start }) {
+        val heard = finalWords.map { Triple(it, false, false) } + volatileWords.map { Triple(it, volatileApproximate, true) }
+        for ((word, isVolatile, isGuess) in heard.sortedBy { it.first.start }) {
             val parts = TextSegmentation.tokens(word.text)
             // a recognizer run of several words: spread them over the run
             val step = (word.end - word.start) / max(1, parts.size)
             for ((i, part) in parts.withIndex()) {
                 if (part in VoiceCommand.fillers) continue
-                spoken.add(Token(part, word.start + i * step, word.start + (i + 1) * step, isVolatile))
+                spoken.add(Token(part, word.start + i * step, word.start + (i + 1) * step, isVolatile, isGuess))
             }
         }
         for (n in intArrayOf(2, 1)) {
@@ -307,8 +322,9 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
             val start = spoken[head].start
             val pause = if (head > 0) start - spoken[head - 1].end else Double.POSITIVE_INFINITY
             val isVolatile = spoken.subList(head, spoken.size).any { it.isVolatile }
+            val isGuess = spoken.subList(head, spoken.size).any { it.isGuess }
             val end = spoken.last().end
-            return Found(Candidate(command, text, start, end), pause, isVolatile, end - spoken[first].start)
+            return Found(Candidate(command, text, start, end), pause, isVolatile, end - spoken[first].start, isGuess)
         }
         return null
     }
@@ -319,6 +335,9 @@ class CommandDetector(var languages: Set<VoiceCommand.Language> = VoiceCommand.L
 
         /** How long a command timed only approximately waits for final words before a timing rejection. */
         private const val FINAL_WAIT = 2.5
+
+        /** Speech heard this long past a command's end means more was said (the energy detector's release is shorter). */
+        private const val SPEECH_TAIL = 0.4
 
         /** A command word said again within this gap is the same command repeated. */
         private const val REPEAT_GAP = 1.0
