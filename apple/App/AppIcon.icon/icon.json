@@ -1,0 +1,64 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.07059,0.10588,0.18824,1.00000"
+  },
+  "groups": [
+    {
+      "name": "headphones",
+      "layers": [
+        {
+          "name": "headphones",
+          "glass": true,
+          "image-name": "ghost-front.png"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "ghost",
+      "layers": [
+        {
+          "name": "ghost",
+          "glass": false,
+          "image-name": "ghost-mid.png"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "glow",
+      "layers": [
+        {
+          "name": "glow",
+          "glass": false,
+          "image-name": "ghost-back.png"
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

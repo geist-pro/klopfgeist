@@ -1,0 +1,452 @@
+{
+ "description": "AudioPlan.make conformance: needs + route (+ echoCancellationAllowed, default true) → plan. Run by both cores.",
+ "cases": [
+  {
+   "name": "no book: nothing is set up",
+   "needs": {
+    "bookOpen": false,
+    "hasPlayed": false,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "inactive",
+    "mixWithOthers": true,
+    "capture": false,
+    "recognize": false,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "book open on the speaker, never played: listen, mix with others, no echo cancellation yet",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": false,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": true,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "playing on the speaker: echo cancellation",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": true,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "AirPods with their own microphone: no echo cancellation, book not audible",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "bluetoothA2DP"
+    ],
+    "input": "bluetoothLE",
+    "headsetMicrophoneAvailable": true
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "AirPods output, built-in microphone: no echo cancellation (it would pull the book off the AirPods)",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "bluetoothA2DP"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": true
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "headset call microphone when the user asked for it",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": true
+   },
+   "route": {
+    "outputs": [
+     "bluetoothHFP"
+    ],
+    "input": "bluetoothHFP",
+    "headsetMicrophoneAvailable": true
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": true,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "car: built-in microphone hears the car speakers",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "carAudio"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": true,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "wired headphones: nothing to cancel",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "wiredHeadphones"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "AirPlay speaker: audible, but echo cancellation can't reach it",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "airPlay"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "voice commands off: plain playback",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": false,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playback",
+    "mixWithOthers": false,
+    "capture": false,
+    "recognize": false,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "voice commands off, comment by button: microphone without recognizer",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": false,
+    "listeningPaused": false,
+    "recording": true,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": false,
+    "echoCancellation": true,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "listening paused: the microphone is let go",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": true,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playback",
+    "mixWithOthers": false,
+    "capture": false,
+    "recognize": false,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "listening paused, comment by button",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": true,
+    "recording": true,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "bluetoothA2DP"
+    ],
+    "input": "bluetoothLE",
+    "headsetMicrophoneAvailable": true
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": false,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "no microphone permission: playback only, even for a comment",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": true,
+    "microphonePermission": false,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playback",
+    "mixWithOthers": false,
+    "capture": false,
+    "recognize": false,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  },
+  {
+   "name": "echo cancellation given up after the route kept flapping",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [
+     "builtInSpeaker"
+    ],
+    "input": "builtInMic",
+    "headsetMicrophoneAvailable": false
+   },
+   "echoCancellationAllowed": false,
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": true
+   }
+  },
+  {
+   "name": "route still empty while switching: no echo cancellation",
+   "needs": {
+    "bookOpen": true,
+    "hasPlayed": true,
+    "voiceCommands": true,
+    "listeningPaused": false,
+    "recording": false,
+    "microphonePermission": true,
+    "useHeadsetMicrophone": false
+   },
+   "route": {
+    "outputs": [],
+    "input": null,
+    "headsetMicrophoneAvailable": false
+   },
+   "plan": {
+    "session": "playAndRecord",
+    "mixWithOthers": false,
+    "capture": true,
+    "recognize": true,
+    "echoCancellation": false,
+    "allowHeadsetCallMicrophone": false,
+    "bookAudible": false
+   }
+  }
+ ]
+}

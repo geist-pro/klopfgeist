@@ -1,0 +1,282 @@
+{
+  "description": "CommandDetector conformance. Both cores (Swift MarginVoiceCore, Kotlin :core) run every case. A step happens at microphone time `at` and is one of: words (+final; +approximate when a volatile guess is timed over the whole run, as SpeechAnalyzer does), text (a result timed as a whole), speech (energy detector), tick, forget, reset. `expect` lists the outcomes of that step in order (default: none). Contexts: policy listening | recording | listeningOverSpeaker; allowed all | recording; bookText optional.",
+  "cases": [
+    {
+      "name": "stop said five times in a row fires once",
+      "why": "Field trace (iPhone, 2026-11-15): “Stop, stop, stop, stop, stop” as one final result, 4 s in all. Only the last word's own length counts as drawn out, not the run of repeats.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 655.0, "final": true, "words": [["Stop,", 650.26, 651.16], ["stop,", 651.16, 652.12], ["stop,", 652.12, 652.96], ["stop,", 652.96, 653.2], ["stop.", 653.2, 654.34]]},
+        {"at": 655.2, "tick": true},
+        {"at": 655.4, "tick": true, "expect": [{"fire": "stop", "start": 650.26, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "a repeated stop counts once, timed from the first",
+      "why": "Field trace (iPhone, speaker, 2026-11-15): the recognizer's final results came about 2 s late, so the user said “stop” again; both arrived together as “Stop. Stop.” and the second was rejected as not isolated from the first. Only every third “stop” worked.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 303.6, "final": true, "words": [["So?", 302.26, 302.62]]},
+        {"at": 305.5, "final": true, "words": [["Stop.", 303.28, 304.36], ["Stop.", 304.36, 304.54]]},
+        {"at": 305.7, "tick": true},
+        {"at": 305.9, "tick": true, "expect": [{"fire": "stop", "start": 303.28, "text": "stop"}]},
+        {"at": 306.5, "final": true, "words": [["Stop,", 304.66, 305.44], ["stop.", 305.44, 305.56]]},
+        {"at": 307.0, "tick": true, "expect": [{"reject": "duplicate", "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "a volatile guess timed over the whole run waits for the final words",
+      "why": "Field trace (iPhone, speaker, 2026-11-15): SpeechAnalyzer's volatile result timed “Continue” from 0.3 to 8.09 s, the whole run so far. It was rejected as too long and the final “Continue.” (7.02–8.04) that followed was skipped as already decided. Timing rejections wait for final words.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 8.1, "approximate": true, "words": [["Continue", 0.3, 8.09]]},
+        {"at": 8.4, "tick": true},
+        {"at": 8.8, "tick": true},
+        {"at": 9.2, "final": true, "words": [["Continue.", 7.02, 8.04]]},
+        {"at": 9.4, "tick": true},
+        {"at": 9.5, "tick": true, "expect": [{"fire": "resume", "start": 7.02, "text": "continue"}]},
+        {"at": 10.5, "tick": true}
+      ]
+    },
+    {
+      "name": "a volatile guess that never becomes final is still decided",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 8.1, "approximate": true, "words": [["Continue", 0.3, 8.09]]},
+        {"at": 9.0, "tick": true},
+        {"at": 10.6, "tick": true, "expect": [{"reject": "tooLong", "text": "continue"}]},
+        {"at": 11.5, "tick": true}
+      ]
+    },
+    {
+      "name": "continue after a short natural pause ends a comment",
+      "why": "Field trace (iPhone, 2026-11-15): “This works. Continue.” with 0.36 s between them was rejected as not isolated (0.45 s needed). The silence after it already tells a closing command from one inside a sentence.",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 20.5, "final": true, "words": [["This", 19.48, 19.6], ["works.", 19.6, 19.78]]},
+        {"at": 21.3, "final": true, "words": [["Continue.", 20.14, 20.74]]},
+        {"at": 21.6, "tick": true},
+        {"at": 22.0, "tick": true, "expect": [{"fire": "resume", "start": 20.14, "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "a lone stop fires without any energy detector",
+      "why": "AirPods: the energy detector often segments nothing. The recognizer's word times are enough.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.5, "tick": true},
+        {"at": 10.66, "tick": true, "expect": [{"fire": "stop", "start": 10.0, "text": "stop"}]},
+        {"at": 11.5, "tick": true}
+      ]
+    },
+    {
+      "name": "words that follow withdraw the command",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 5.2, "words": [["stop", 5.0, 5.2]]},
+        {"at": 5.4, "words": [["stop", 5.0, 5.2], ["the", 5.25, 5.35]], "expect": [{"reject": "speechContinued", "text": "stop"}]},
+        {"at": 5.9, "words": [["stop", 5.0, 5.2], ["the", 5.25, 5.35], ["presses", 5.4, 5.8]]},
+        {"at": 7.0, "tick": true}
+      ]
+    },
+    {
+      "name": "a recognizer that runs behind does not fire early",
+      "why": "The command arrives 0.7 s after it was said. Settling counts from arrival, so the following words still withdraw it.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 5.9, "words": [["stop", 5.0, 5.2]]},
+        {"at": 6.1, "words": [["stop", 5.0, 5.2], ["the", 5.25, 5.35], ["presses", 5.4, 5.8]], "expect": [{"reject": "speechContinued", "text": "stop"}]},
+        {"at": 7.0, "tick": true}
+      ]
+    },
+    {
+      "name": "continue after a pause ends a comment",
+      "why": "The closing command is the tail of the same stretch of speech as the comment; it needs a pause before it, not an utterance of its own.",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 20.5, "final": true, "words": [["this", 19.0, 19.2], ["is", 19.2, 19.3], ["weak", 19.3, 19.7]]},
+        {"at": 20.6, "words": [["continue", 20.2, 20.6]]},
+        {"at": 21.0, "tick": true},
+        {"at": 21.25, "tick": true, "expect": [{"fire": "resume", "start": 20.2, "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "continue at the end of a sentence is part of the comment",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 31.0, "words": [["we", 30.0, 30.2], ["should", 30.2, 30.5], ["continue", 30.5, 31.0]]},
+        {"at": 31.3, "tick": true},
+        {"at": 31.7, "tick": true, "expect": [{"reject": "notIsolated", "text": "continue"}]},
+        {"at": 32.5, "tick": true}
+      ]
+    },
+    {
+      "name": "continue in the middle of a sentence",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 31.0, "words": [["we", 30.0, 30.2], ["should", 30.2, 30.5], ["continue", 30.5, 31.0]]},
+        {"at": 31.3, "words": [["we", 30.0, 30.2], ["should", 30.2, 30.5], ["continue", 30.5, 31.0], ["the", 31.0, 31.1], ["analysis", 31.1, 31.6]], "expect": [{"reject": "speechContinued", "text": "continue"}]},
+        {"at": 32.5, "tick": true}
+      ]
+    },
+    {
+      "name": "stop said inside a comment is speech",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 5.35, "words": [["stop", 5.0, 5.3]]},
+        {"at": 6.5, "tick": true}
+      ]
+    },
+    {
+      "name": "the book said it",
+      "context": {"policy": "listeningOverSpeaker", "bookText": "the robot must stop early"},
+      "steps": [
+        {"at": 8.35, "words": [["stop", 8.0, 8.3]]},
+        {"at": 8.7, "tick": true, "expect": [{"reject": "bookEcho", "text": "stop"}]},
+        {"at": 9.5, "tick": true}
+      ]
+    },
+    {
+      "name": "noise that looks like speech delays a command, never blocks it",
+      "why": "The old pipeline waited for the energy detector to close an utterance; in wind or traffic it never did.",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.36, "speech": true},
+        {"at": 10.7, "tick": true},
+        {"at": 11.4, "tick": true},
+        {"at": 11.6, "tick": true, "expect": [{"fire": "stop", "start": 10.0, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "a command is decided as soon as audible speech ends",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.0, "speech": true},
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.7, "tick": true},
+        {"at": 10.75, "speech": false},
+        {"at": 10.8, "tick": true, "expect": [{"fire": "stop", "start": 10.0, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "over a loudspeaker the energy detector is waited for only briefly",
+      "context": {"policy": "listeningOverSpeaker", "bookText": "endpoint prediction"},
+      "steps": [
+        {"at": 8.0, "speech": true},
+        {"at": 8.35, "words": [["stop", 8.0, 8.3]]},
+        {"at": 8.9, "tick": true},
+        {"at": 9.0, "tick": true, "expect": [{"fire": "stop", "start": 8.0, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "the final result for a fired command does not fire again",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.7, "tick": true, "expect": [{"fire": "stop", "start": 10.0, "text": "stop"}]},
+        {"at": 10.9, "final": true, "words": [["Stop.", 10.05, 10.45]]},
+        {"at": 11.5, "tick": true}
+      ]
+    },
+    {
+      "name": "the same command twice in a row counts once",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.7, "tick": true, "expect": [{"fire": "stop", "start": 10.0, "text": "stop"}]},
+        {"at": 11.0, "words": [["stop", 10.0, 10.3], ["stop", 10.7, 10.95]]},
+        {"at": 11.35, "tick": true, "expect": [{"reject": "duplicate", "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "a two-word German command grows and fires once",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 3.35, "words": [["Weiter", 3.0, 3.3]]},
+        {"at": 3.6, "words": [["Weiter", 3.0, 3.3], ["machen", 3.3, 3.6]]},
+        {"at": 3.8, "tick": true},
+        {"at": 3.95, "tick": true, "expect": [{"fire": "resume", "start": 3.0, "text": "weiter machen"}]}
+      ]
+    },
+    {
+      "name": "fillers around a command are ignored",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 1.85, "words": [["Okay,", 1.0, 1.2], ["stop", 1.25, 1.5], ["please.", 1.55, 1.8]]},
+        {"at": 2.2, "tick": true, "expect": [{"fire": "stop", "start": 1.25, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "a recognizer run of several words is split before the pause is measured",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 31.0, "words": [["weak continue", 30.0, 31.0]]},
+        {"at": 31.7, "tick": true, "expect": [{"reject": "notIsolated", "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "a result timed only as a whole",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 4.45, "text": {"text": "Stop.", "start": 4.0, "end": 4.4}},
+        {"at": 4.8, "tick": true, "expect": [{"fire": "stop", "start": 4.0, "text": "stop"}]}
+      ]
+    },
+    {
+      "name": "mark this is one command",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 7.32, "words": [["mark", 7.0, 7.3]]},
+        {"at": 7.5, "words": [["mark", 7.0, 7.3], ["this", 7.3, 7.5]]},
+        {"at": 7.7, "tick": true},
+        {"at": 7.85, "tick": true, "expect": [{"fire": "mark", "start": 7.0, "text": "mark this"}]}
+      ]
+    },
+    {
+      "name": "what was said before a comment began is forgotten",
+      "context": {"policy": "recording", "allowed": "recording"},
+      "steps": [
+        {"at": 9.0, "words": [["continue", 8.5, 8.9]]},
+        {"at": 9.05, "forget": 9.05},
+        {"at": 9.8, "tick": true}
+      ]
+    },
+    {
+      "name": "a drawn-out command word is speech",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 7.55, "words": [["continue", 5.0, 7.5]]},
+        {"at": 7.9, "tick": true, "expect": [{"reject": "tooLong", "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "a command after earlier talk needs only the pause",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 1.8, "final": true, "words": [["so", 1.0, 1.2], ["anyway", 1.2, 1.6]]},
+        {"at": 2.65, "words": [["continue", 2.2, 2.6]]},
+        {"at": 3.0, "tick": true, "expect": [{"fire": "resume", "start": 2.2, "text": "continue"}]}
+      ]
+    },
+    {
+      "name": "a microphone restart forgets everything",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.4, "reset": true},
+        {"at": 10.9, "tick": true}
+      ]
+    },
+    {
+      "name": "a guess the recognizer takes back leaves no trace",
+      "context": {"policy": "listening"},
+      "steps": [
+        {"at": 10.35, "words": [["stop", 10.0, 10.3]]},
+        {"at": 10.5, "words": [["top", 10.0, 10.3]]},
+        {"at": 11.5, "tick": true}
+      ]
+    }
+  ]
+}

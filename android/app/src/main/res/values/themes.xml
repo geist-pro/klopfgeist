@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark end to end like the iOS app (it is mostly used in a car, often at night).
+         The window starts in Gruvbox, the default palette, so launch never flashes white. -->
+    <style name="Theme.MarginVoice" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

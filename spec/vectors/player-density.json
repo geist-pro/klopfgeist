@@ -1,0 +1,14 @@
+{
+ "description": "PlayerDensity conformance: what the player shows around the sentence being read, from the text scale (1.0 = the system's default text size; iOS: the scaled body size / 17, Android: the font scale). At large text the sentence being read keeps the room: the sentences before and after it and the book title go, and the chapter header takes one line. Run by both cores.",
+ "cases": [
+  { "name": "default text size", "textScale": 1.0, "density": "full" },
+  { "name": "smaller than default", "textScale": 0.85, "density": "full" },
+  { "name": "Android 130 %", "textScale": 1.3, "density": "full" },
+  { "name": "iOS xxxLarge, the largest non-accessibility size", "textScale": 1.353, "density": "full" },
+  { "name": "just under the threshold", "textScale": 1.49, "density": "full" },
+  { "name": "Android 150 %", "textScale": 1.5, "density": "focused" },
+  { "name": "iOS accessibility 1", "textScale": 1.647, "density": "focused" },
+  { "name": "Android 200 %", "textScale": 2.0, "density": "focused" },
+  { "name": "iOS accessibility 5", "textScale": 3.118, "density": "focused" }
+ ]
+}

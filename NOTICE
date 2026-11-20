@@ -1,0 +1,69 @@
+Klopfgeist
+Copyright 2026 Kai Kunze and the GEIST group, TU Clausthal
+
+The apps show their own notices under Settings > Licences. Both are repeated here.
+
+== iPhone, iPad and Mac ==
+
+Klopfgeist for iPhone, iPad and Mac
+Copyright 2026 Kai Kunze
+
+Speech recognition, the system voices and the on-device writing help are Apple's
+frameworks. Klopfgeist for Mac also includes the following third-party software.
+Apache-2.0 components are licensed under the Apache License, Version 2.0 (below);
+MIT components under the MIT License (below).
+
+- speech-swift (KokoroTTS, Qwen3TTS): Copyright soniqo, Apache-2.0
+- MLX Swift, MLX Swift LM: Copyright Apple Inc. and the MLX contributors, MIT
+- swift-transformers, swift-huggingface: Copyright Hugging Face, Apache-2.0
+- swift-jinja: Copyright Hugging Face and contributors, MIT
+- Swift Numerics, Swift Collections: Copyright Apple Inc., Apache-2.0 with the Runtime Library Exception
+
+Voices (downloaded on first use, not part of the app):
+- Kokoro-82M by hexgrad (based on StyleTTS 2): Apache-2.0
+- kikiri German voices (Martin, Victoria): Apache-2.0
+- Qwen3-TTS by the Qwen team, Alibaba Cloud: Apache-2.0. The two German
+  Qwen3 voices were designed from a text description, not cloned from a person.
+
+== Android ==
+
+Klopfgeist for Android
+Copyright 2026 Kai Kunze
+
+This app includes the following third-party software and models. Unless noted
+otherwise they are licensed under the Apache License, Version 2.0 (Apache-2.0.txt).
+
+- AndroidX, Jetpack Compose, Media3 (ExoPlayer): Copyright The Android Open Source Project
+- Kotlin, kotlinx.coroutines, kotlinx.serialization: Copyright JetBrains s.r.o. and contributors
+- OkHttp, Okio: Copyright Square, Inc.
+- Vosk speech recognition (vosk-api, vosk-android): Copyright Alpha Cephei Inc.
+  JNA is used under its Apache-2.0 option.
+- Vosk models vosk-model-small-en-us-0.15 and vosk-model-small-de-0.15: Copyright Alpha Cephei Inc.
+- PdfBox-Android: Copyright Tom Roush and contributors; a port of Apache PDFBox.
+
+  Apache PDFBox
+  Copyright 2002-2026 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (http://www.apache.org/).
+
+  Based on source code contributed to the original PDFBox project.
+  Copyright (c) 2002-2007, www.pdfbox.org
+
+  Includes the Adobe Glyph List
+  Copyright 1997, 1998, 2002, 2007, 2010 Adobe Systems Incorporated.
+
+  Includes the Zapf Dingbats Glyph List
+  Copyright 2002, 2010 Adobe Systems Incorporated.
+
+  Includes the Bidi Mirroring Glyph Property (BidiMirroring-8.0.0.txt)
+  Copyright 1991-2015 Unicode, Inc.
+
+  Includes parts of TwelveMonkeys ImageIO
+  Copyright 2008-2016 Harald Kuhr
+
+Fonts, under the SIL Open Font License 1.1 (the *-OFL.txt files):
+- Inter: Copyright The Inter Project Authors
+- Literata: Copyright The Literata Project Authors
+- Source Serif 4: Copyright Adobe
+- Charis SIL: Copyright SIL International

@@ -1,0 +1,530 @@
+{
+ "description": "ReviewMachine conformance. Each step feeds one event (`do`) at media time `time`, playback `rate` and wall clock `now`; `effects` (when given) are the exact effects, `state` (when given) is the state afterwards: paused | playing | recording. Numbers in effects are printed without trailing zeros. Run by both cores.",
+ "cases": [
+  {
+   "name": "stop, comment, continue",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 100,
+     "rate": 1.3,
+     "now": 1,
+     "effects": [
+      "pause",
+      "beep:recordStart",
+      "startRecording:98.5"
+     ],
+     "state": "recording"
+    },
+    {
+     "do": "command:faster",
+     "time": 100,
+     "rate": 1.3,
+     "now": 5,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "command:resume",
+     "time": 100,
+     "rate": 1.3,
+     "now": 9,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:98",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "cancel discards",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "remote:next",
+     "time": 10,
+     "rate": 1.0,
+     "now": 1,
+     "effects": [
+      "pause",
+      "beep:recordStart",
+      "startRecording:8.5"
+     ],
+     "state": "recording"
+    },
+    {
+     "do": "command:cancel",
+     "time": 10,
+     "rate": 1.0,
+     "now": 4,
+     "effects": [
+      "finishRecording:false",
+      "beep:recordDiscarded",
+      "seekToSentence:8",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "a comment started while paused is anchored where the book stands",
+   "steps": [
+    {
+     "do": "commentButton",
+     "time": 50,
+     "rate": 1.0,
+     "now": 1,
+     "effects": [
+      "pause",
+      "beep:recordStart",
+      "startRecording:50"
+     ],
+     "state": "recording"
+    },
+    {
+     "do": "commentButton",
+     "time": 50,
+     "rate": 1.0,
+     "now": 6,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:48",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "an abandoned comment leaves the book paused",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 100,
+     "rate": 1.0,
+     "now": 1,
+     "state": "recording"
+    },
+    {
+     "do": "commentAbandoned:true",
+     "time": 100,
+     "rate": 1.0,
+     "now": 30,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:98"
+     ],
+     "state": "paused"
+    }
+   ]
+  },
+  {
+   "name": "the same headset press reported twice counts once",
+   "why": "AirPods and cars deliver some presses twice; the second used to end the comment the first had started.",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "remote:next",
+     "time": 10,
+     "rate": 1.0,
+     "now": 1.0,
+     "effects": [
+      "pause",
+      "beep:recordStart",
+      "startRecording:8.5"
+     ],
+     "state": "recording"
+    },
+    {
+     "do": "remote:next",
+     "time": 10,
+     "rate": 1.0,
+     "now": 1.05,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "remote:playPause",
+     "time": 10,
+     "rate": 1.0,
+     "now": 5.0,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:8",
+      "play"
+     ],
+     "state": "playing"
+    },
+    {
+     "do": "remote:play",
+     "time": 10,
+     "rate": 1.0,
+     "now": 5.1,
+     "effects": [],
+     "state": "playing"
+    },
+    {
+     "do": "remote:pause",
+     "time": 12,
+     "rate": 1.0,
+     "now": 5.2,
+     "effects": [],
+     "state": "playing"
+    },
+    {
+     "do": "remote:pause",
+     "time": 14,
+     "rate": 1.0,
+     "now": 7.0,
+     "effects": [
+      "pause"
+     ],
+     "state": "paused"
+    }
+   ]
+  },
+  {
+   "name": "an AirPod taken out and put back does not end the comment",
+   "why": "Ear detection sends pause, then play. Play used to save the comment and start the book.",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 100,
+     "rate": 1.0,
+     "now": 1,
+     "state": "recording"
+    },
+    {
+     "do": "remote:pause",
+     "time": 100,
+     "rate": 1.0,
+     "now": 3,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "remote:play",
+     "time": 100,
+     "rate": 1.0,
+     "now": 8,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "remote:play",
+     "time": 100,
+     "rate": 1.0,
+     "now": 12,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:98",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "a deliberate press after the AirPod came out still ends the comment",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 100,
+     "rate": 1.0,
+     "now": 1,
+     "state": "recording"
+    },
+    {
+     "do": "remote:pause",
+     "time": 100,
+     "rate": 1.0,
+     "now": 3,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "remote:playPause",
+     "time": 100,
+     "rate": 1.0,
+     "now": 8,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:98",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "ear detection in one comment does not carry into the next",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 100,
+     "rate": 1.0,
+     "now": 1,
+     "state": "recording"
+    },
+    {
+     "do": "remote:pause",
+     "time": 100,
+     "rate": 1.0,
+     "now": 3,
+     "effects": [],
+     "state": "recording"
+    },
+    {
+     "do": "command:resume",
+     "time": 100,
+     "rate": 1.0,
+     "now": 6,
+     "state": "playing"
+    },
+    {
+     "do": "command:stop",
+     "time": 120,
+     "rate": 1.0,
+     "now": 20,
+     "state": "recording"
+    },
+    {
+     "do": "remote:play",
+     "time": 120,
+     "rate": 1.0,
+     "now": 25,
+     "effects": [
+      "finishRecording:true",
+      "beep:recordSaved",
+      "seekToSentence:118",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "back twice in a row doubles the step",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:back",
+     "time": 100,
+     "rate": 1.0,
+     "now": 10,
+     "effects": [
+      "seek:85"
+     ]
+    },
+    {
+     "do": "command:back",
+     "time": 85,
+     "rate": 1.0,
+     "now": 13,
+     "effects": [
+      "seek:55"
+     ]
+    },
+    {
+     "do": "command:back",
+     "time": 55,
+     "rate": 1.0,
+     "now": 40,
+     "effects": [
+      "seek:40"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "a second bookmark closes a passage",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:mark",
+     "time": 100,
+     "rate": 1.0,
+     "now": 10,
+     "effects": [
+      "addBookmark:98.5",
+      "beep:bookmark"
+     ]
+    },
+    {
+     "do": "command:mark",
+     "time": 140,
+     "rate": 1.0,
+     "now": 50,
+     "effects": [
+      "closeBookmark:138.5",
+      "beep:bookmarkEnd"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "stop, then mark: a bookmark instead of a comment",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:stop",
+     "time": 10,
+     "rate": 1.0,
+     "now": 1,
+     "state": "recording"
+    },
+    {
+     "do": "command:mark",
+     "time": 12,
+     "rate": 1.0,
+     "now": 3,
+     "effects": [
+      "finishRecording:false",
+      "addBookmark:8.5",
+      "beep:bookmark",
+      "seekToSentence:8",
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  },
+  {
+   "name": "speed changes are clamped and announced",
+   "steps": [
+    {
+     "do": "setPlaying:true",
+     "time": 0,
+     "rate": 1.0,
+     "now": 0
+    },
+    {
+     "do": "command:faster",
+     "time": 0,
+     "rate": 1.3,
+     "now": 1,
+     "effects": [
+      "setRate:1.4",
+      "announce:1.4"
+     ]
+    },
+    {
+     "do": "command:faster",
+     "time": 0,
+     "rate": 2.5,
+     "now": 3,
+     "effects": []
+    },
+    {
+     "do": "command:slower",
+     "time": 0,
+     "rate": 1.0,
+     "now": 5,
+     "effects": [
+      "setRate:0.9",
+      "announce:0.9"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "play and pause from the lock screen",
+   "steps": [
+    {
+     "do": "remote:playPause",
+     "time": 5,
+     "rate": 1.0,
+     "now": 1,
+     "effects": [
+      "play"
+     ],
+     "state": "playing"
+    },
+    {
+     "do": "remote:pause",
+     "time": 9,
+     "rate": 1.0,
+     "now": 4,
+     "effects": [
+      "pause"
+     ],
+     "state": "paused"
+    },
+    {
+     "do": "command:resume",
+     "time": 9,
+     "rate": 1.0,
+     "now": 8,
+     "effects": [
+      "play"
+     ],
+     "state": "playing"
+    }
+   ]
+  }
+ ]
+}

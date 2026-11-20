@@ -1,0 +1,18 @@
+{
+ "description": "StatusAnnouncement conformance: what a screen reader is told when the listening status changes (`from` → `to`: off | starting | listening | paused | unavailable). `say` is the exact text, or null for silence. Nothing is said while a comment is recorded (the microphone would record the screen reader), and recording, saving and bookmarks are not announced at all: they have tones. Run by both cores.",
+ "cases": [
+  { "name": "nothing changed", "from": "listening", "to": "listening", "recording": false, "say": null },
+  { "name": "preparing is not worth a sentence", "from": "off", "to": "starting", "recording": false, "say": null },
+  { "name": "the microphone is on", "from": "starting", "to": "listening", "recording": false, "say": "Listening for voice commands" },
+  { "name": "voice commands turned on while ready", "from": "off", "to": "listening", "recording": false, "say": "Listening for voice commands" },
+  { "name": "the pause timeout ran out", "from": "listening", "to": "paused", "recording": false, "say": "Listening paused" },
+  { "name": "play resumes listening", "from": "paused", "to": "listening", "recording": false, "say": "Listening for voice commands" },
+  { "name": "turned off", "from": "listening", "to": "off", "recording": false, "say": "Voice commands off" },
+  { "name": "turned off while paused", "from": "paused", "to": "off", "recording": false, "say": "Voice commands off" },
+  { "name": "the recognizer failed", "from": "starting", "to": "unavailable", "recording": false, "say": "Voice commands unavailable" },
+  { "name": "lost while listening", "from": "listening", "to": "unavailable", "recording": false, "say": "Voice commands unavailable" },
+  { "name": "recovered", "from": "unavailable", "to": "listening", "recording": false, "say": "Listening for voice commands" },
+  { "name": "never into a comment", "from": "listening", "to": "paused", "recording": true, "say": null },
+  { "name": "never into a comment, even a failure", "from": "listening", "to": "unavailable", "recording": true, "say": null }
+ ]
+}

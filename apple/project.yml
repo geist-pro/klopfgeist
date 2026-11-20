@@ -1,0 +1,194 @@
+name: MarginVoice
+options:
+  bundleIdPrefix: pro.geist
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    DEVELOPMENT_TEAM: 8H42EZRCCP
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    # Sync through iCloud Drive needs the container iCloud.pro.geist.klopfgeist, which has to exist in the
+    # developer portal and be ticked for the App ID. Until then (and for anyone building without the team)
+    # the default is "local": no iCloud entitlement, the iCloud switch is hidden, WebDAV sync works.
+    # Build with MV_SYNC=icloud once the container is there.
+    MV_SYNC: local
+packages:
+  # core (pure), session (ports) and the Apple adapters
+  MarginVoiceKit:
+    path: MarginVoiceKit
+  # natural voices (Kokoro, Qwen3), Apache-2.0, run on the device
+  SpeechSwift:
+    url: https://github.com/soniqo/speech-swift
+    revision: 9ce78eaec038b4dc8b519a8b01ecb4059549cfec
+targets:
+  MarginVoice:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes: [AppIcon.icon, "*.entitlements"]
+      # Icon Composer document (iOS 26 / macOS 26 layered icon); the asset catalog's AppIcon.png is the fallback
+      - path: App/AppIcon.icon
+        buildPhase: resources
+    dependencies:
+      - package: MarginVoiceKit
+        product: MarginVoiceCore
+      - package: MarginVoiceKit
+        product: MarginVoiceSession
+      - package: MarginVoiceKit
+        product: MarginVoiceApple
+    scheme:
+      testTargets: [MarginVoiceTests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pro.geist.klopfgeist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # the icon choices in Settings (AppIconDesign): two designs in five themes
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Ghost-gruvbox AppIcon-Ghost-gruvboxDark AppIcon-Ghost-gruvboxLight AppIcon-Ghost-geist AppIcon-Ghost-geistDark AppIcon-ReadLine-gruvbox AppIcon-ReadLine-gruvboxDark AppIcon-ReadLine-gruvboxLight AppIcon-ReadLine-geist AppIcon-ReadLine-geistDark"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: App/MarginVoice-$(MV_SYNC).entitlements
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Klopfgeist
+        CFBundleName: Klopfgeist
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # HTTPS only (sync, voice downloads): exempt, so TestFlight asks no export questions
+        ITSAppUsesNonExemptEncryption: false
+        # "icloud" when the build carries the iCloud entitlement (ICloudFolder.isBuiltIn)
+        MVSync: $(MV_SYNC)
+        UILaunchScreen: {}
+        UIBackgroundModes: [audio, processing]
+        BGTaskSchedulerPermittedIdentifiers: [de.kaikunze.drafttalk.convert.*]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: PDF Document
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.adobe.pdf]
+          - CFBundleTypeName: Text Document
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.plain-text, net.daringfireball.markdown, public.rtf]
+          - CFBundleTypeName: Audiobook
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.mpeg-4-audio, com.apple.m4a-audio, public.audio]
+          - CFBundleTypeName: Klopfgeist Book
+            LSHandlerRank: Owner
+            LSItemContentTypes: [de.kaikunze.drafttalk.book]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: de.kaikunze.drafttalk.book
+            UTTypeDescription: Klopfgeist Book
+            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [drafttalk]
+              public.mime-type: [application/vnd.drafttalk+zip]
+        # the iCloud Drive folder sync uses, shown as "Klopfgeist" in Files and Finder
+        NSUbiquitousContainers:
+          iCloud.pro.geist.klopfgeist:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Klopfgeist
+            NSUbiquitousContainerSupportedFolderLevels: Any
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        NSMicrophoneUsageDescription: Klopfgeist listens for your voice commands (like “stop”) and records your spoken comments while the book plays.
+        NSSpeechRecognitionUsageDescription: Klopfgeist recognizes voice commands and transcribes your comments on this device.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+  MarginVoiceMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: App/Models
+      - path: App/Session
+      - path: App/Voice
+      - path: App/Conversion
+      - path: App/UI
+        excludes: [NowPlayingBar.swift]
+      # the iPhone screens stay on iOS; the Mac has its own root, library and reading pane
+      - path: App/Views
+        excludes: [RootView.swift, LibraryView.swift, PlayerView.swift]
+      - path: App/Assets.xcassets
+      - path: App/PrivacyInfo.xcprivacy
+      - path: App/AppIcon.icon
+        buildPhase: resources
+      - path: AppMac
+        excludes: ["*.entitlements"]
+    dependencies:
+      - package: MarginVoiceKit
+        product: MarginVoiceCore
+      - package: MarginVoiceKit
+        product: MarginVoiceSession
+      - package: MarginVoiceKit
+        product: MarginVoiceApple
+      - package: SpeechSwift
+        product: KokoroTTS
+      - package: SpeechSwift
+        product: Qwen3TTS
+    settings:
+      base:
+        # same bundle ID as the iOS app: one App Store record, universal purchase
+        PRODUCT_BUNDLE_IDENTIFIER: pro.geist.klopfgeist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Apple silicon only: the Kokoro voice uses Float16, which Intel Macs lack (packages ignore
+        # this setting, so archive with ARCHS=arm64 passed to xcodebuild for everything)
+        ARCHS: arm64
+        CODE_SIGN_ENTITLEMENTS: AppMac/MarginVoiceMac-$(MV_SYNC).entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+    info:
+      path: AppMac/Info.plist
+      properties:
+        CFBundleDisplayName: Klopfgeist
+        CFBundleName: Klopfgeist
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        # "icloud" when the build carries the iCloud entitlement (ICloudFolder.isBuiltIn)
+        MVSync: $(MV_SYNC)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: "26.0"
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Klopfgeist Book
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [de.kaikunze.drafttalk.book]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: de.kaikunze.drafttalk.book
+            UTTypeDescription: Klopfgeist Book
+            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [drafttalk]
+              public.mime-type: [application/vnd.drafttalk+zip]
+        # the iCloud Drive folder sync uses, shown as "Klopfgeist" in Files and Finder
+        NSUbiquitousContainers:
+          iCloud.pro.geist.klopfgeist:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Klopfgeist
+            NSUbiquitousContainerSupportedFolderLevels: Any
+        NSMicrophoneUsageDescription: Klopfgeist records your spoken comments and, if you turn voice commands on, listens for them while the book plays.
+        NSSpeechRecognitionUsageDescription: Klopfgeist recognizes voice commands and transcribes your comments on this Mac.
+  MarginVoiceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: MarginVoice
+      - package: MarginVoiceKit
+        product: MarginVoiceCore
+      - package: MarginVoiceKit
+        product: MarginVoiceSession
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pro.geist.klopfgeist.tests
+        GENERATE_INFOPLIST_FILE: YES
