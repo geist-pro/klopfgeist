@@ -138,6 +138,9 @@ targets:
       base:
         # same bundle ID as the iOS app: one App Store record, universal purchase
         PRODUCT_BUNDLE_IDENTIFIER: pro.geist.klopfgeist
+        # the Finder shows the file name: Klopfgeist.app, while the Swift module keeps the target's name
+        PRODUCT_NAME: Klopfgeist
+        PRODUCT_MODULE_NAME: MarginVoiceMac
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # Apple silicon only: the Kokoro voice uses Float16, which Intel Macs lack (packages ignore

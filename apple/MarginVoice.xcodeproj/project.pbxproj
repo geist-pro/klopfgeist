@@ -860,6 +860,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.geist.klopfgeist;
+				PRODUCT_MODULE_NAME = MarginVoiceMac;
+				PRODUCT_NAME = Klopfgeist;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -899,6 +901,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = pro.geist.klopfgeist;
+				PRODUCT_MODULE_NAME = MarginVoiceMac;
+				PRODUCT_NAME = Klopfgeist;
 				SDKROOT = macosx;
 			};
 			name = Debug;
