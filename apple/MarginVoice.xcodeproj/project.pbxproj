@@ -105,6 +105,7 @@
 		B399B971181179CF056D8FCA /* PaletteContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C44A432471368DFAF782A65 /* PaletteContrastTests.swift */; };
 		BE00F04E0B988CAFC7507907 /* LicencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD39AB5F04DED8FBCCC8F36 /* LicencesView.swift */; };
 		C13A96643D88EBB55B84D05E /* Binding+Presenting.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03E04540B99E1CE69340C0F /* Binding+Presenting.swift */; };
+		C37159295A5054A75892D4C3 /* ObjCException.m in Sources */ = {isa = PBXBuildFile; fileRef = E00340A84106A7CB78F37E06 /* ObjCException.m */; };
 		C3C4D8E668C06F3BB9411991 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFC29E325907391581AEF96 /* Book.swift */; };
 		C3E4548BFA64335CA20B5C34 /* PDFAnnotator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE37BC88D2082436390C9D87 /* PDFAnnotator.swift */; };
 		C5D6FFB0F6E4EF1226277B2A /* MarginVoiceCore in Frameworks */ = {isa = PBXBuildFile; productRef = 394DD660CC5D6D3BB8098996 /* MarginVoiceCore */; };
@@ -156,6 +157,7 @@
 		103BAE41B9CC800F41F9AE8F /* SyncCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCenter.swift; sourceTree = "<group>"; };
 		10FB185A7C1A006ACF279C8E /* Book+Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Book+Timeline.swift"; sourceTree = "<group>"; };
 		122551B08BFE12855D0B08D5 /* InboxWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxWatcher.swift; sourceTree = "<group>"; };
+		13438D79EA2AED699CD72F0D /* ObjCException.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ObjCException.h; sourceTree = "<group>"; };
 		17BF595DD6B09413A61CD0C7 /* NowPlayingBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingBar.swift; sourceTree = "<group>"; };
 		19C41CD6212FAE9DCE02A07C /* CommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsView.swift; sourceTree = "<group>"; };
 		298A0078EB156CB7A94F7A88 /* VoiceNotePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceNotePlayer.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 		B4C4DAD6F99FAB05B4184FC0 /* TagChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagChip.swift; sourceTree = "<group>"; };
 		B4E3B4B602157189521AB787 /* MacRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRootView.swift; sourceTree = "<group>"; };
 		B763D024CFD36E56E782A2C2 /* de_designed_male.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = de_designed_male.wav; sourceTree = "<group>"; };
+		BE0C45338DC0691687D02EDD /* MarginVoiceMac-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MarginVoiceMac-Bridging-Header.h"; sourceTree = "<group>"; };
 		BE33E1735F4936410FE7029C /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		BE37BC88D2082436390C9D87 /* PDFAnnotator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFAnnotator.swift; sourceTree = "<group>"; };
 		C0FB983D8FF6ACB6202A23D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -214,6 +217,7 @@
 		D27DC0D7E0EF8322C4B7F625 /* BigControlButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigControlButton.swift; sourceTree = "<group>"; };
 		D2B3B701776D505F29AEF086 /* TransportBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportBar.swift; sourceTree = "<group>"; };
 		DF25F552970ACEDCEDE98FBD /* AppIconSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconSwitcher.swift; sourceTree = "<group>"; };
+		E00340A84106A7CB78F37E06 /* ObjCException.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ObjCException.m; sourceTree = "<group>"; };
 		E03E04540B99E1CE69340C0F /* Binding+Presenting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Binding+Presenting.swift"; sourceTree = "<group>"; };
 		E160EC4FAE2AD75BDDAB8683 /* AppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceTests.swift; sourceTree = "<group>"; };
 		E2ECBCF21418BB186ABFD9D9 /* PDFAnnotatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFAnnotatorTests.swift; sourceTree = "<group>"; };
@@ -359,7 +363,10 @@
 				FF1726B83777EF681D3F44CF /* Info.plist */,
 				53C64E4F2D62068780597C28 /* MacLibrarySidebar.swift */,
 				B4E3B4B602157189521AB787 /* MacRootView.swift */,
+				BE0C45338DC0691687D02EDD /* MarginVoiceMac-Bridging-Header.h */,
 				9DD5CDE987ED5F221CA6D3A6 /* MarginVoiceMacApp.swift */,
+				13438D79EA2AED699CD72F0D /* ObjCException.h */,
+				E00340A84106A7CB78F37E06 /* ObjCException.m */,
 				9B1E8952F1A06C08FD16F6A3 /* ReadingView.swift */,
 				D2B3B701776D505F29AEF086 /* TransportBar.swift */,
 				8F2A65C727E67895B6DAFF22 /* Voices */,
@@ -699,6 +706,7 @@
 				D0934D3BF029D478841528F8 /* MacRootView.swift in Sources */,
 				9807D976275486738C9544FA /* MarginVoiceMacApp.swift in Sources */,
 				F771511E21B0E5351B3D35A6 /* NeuralVoices.swift in Sources */,
+				C37159295A5054A75892D4C3 /* ObjCException.m in Sources */,
 				FFB42A1DBFABF0E3D4D110FC /* PDFAnnotator.swift in Sources */,
 				AA35C88DB899F4D0F3B065DA /* Persistence.swift in Sources */,
 				967BC2F515FEA29772833761 /* ReadingView.swift in Sources */,
@@ -863,6 +871,7 @@
 				PRODUCT_MODULE_NAME = MarginVoiceMac;
 				PRODUCT_NAME = Klopfgeist;
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "AppMac/MarginVoiceMac-Bridging-Header.h";
 			};
 			name = Release;
 		};
@@ -904,6 +913,7 @@
 				PRODUCT_MODULE_NAME = MarginVoiceMac;
 				PRODUCT_NAME = Klopfgeist;
 				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "AppMac/MarginVoiceMac-Bridging-Header.h";
 			};
 			name = Debug;
 		};

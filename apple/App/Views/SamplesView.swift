@@ -28,9 +28,7 @@ struct SamplesView: View {
       #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
       #endif
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-      }
+      .sheetButtons(confirm: "Done", onConfirm: { dismiss() })
     }
     #if os(macOS)
       .frame(width: 520, height: 440)

@@ -65,8 +65,29 @@ public final class ReviewSession {
     didSet {
       guard settings != oldValue, book != nil else { return }
       if settings.commandLanguage != oldValue.commandLanguage { languageChanged = true }
-      if settings.voiceCommandsEnabled, !oldValue.voiceCommandsEnabled { isListeningPaused = false }
+      if settings.voiceCommandsEnabled, !oldValue.voiceCommandsEnabled {
+        isListeningPaused = false
+        // turned on with the microphone never asked for (the Mac starts with voice commands off):
+        // ask now, or the plan has no microphone and listening silently stays off
+        permission = capture.microphonePermission
+        if permission == .undetermined {
+          askForMicrophone()
+          return
+        }
+      }
       replan()
+    }
+  }
+
+  private var permissionTask: Task<Void, Never>?
+
+  private func askForMicrophone() {
+    guard permissionTask == nil else { return }
+    permissionTask = Task { [weak self] in
+      guard let self else { return }
+      self.permission = await self.capture.requestMicrophonePermission() ? .granted : .denied
+      self.permissionTask = nil
+      self.replan()
     }
   }
   /// The app is in the background (iOS): a paused book lets go of the microphone sooner.
@@ -195,7 +216,8 @@ public final class ReviewSession {
   /// Waits until the audio setup has caught up with the latest plan (and a
   /// recording that was starting has started).
   public func idle() async {
-    while pump != nil || recordingTask != nil {
+    while pump != nil || recordingTask != nil || permissionTask != nil {
+      await permissionTask?.value
       await pump?.value
       await recordingTask?.value
     }

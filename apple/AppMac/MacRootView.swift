@@ -72,24 +72,27 @@ struct MacRootView: View {
       }
       .sharedBackgroundVisibility(.hidden)
       if selectedBook != nil {
-        // what the microphone is doing, where everyone looks for it on a Mac: the title bar
+        // what the microphone is doing, where everyone looks for it on a Mac: the title bar,
+        // in the same glass capsule as the buttons beside it
         ToolbarItem(placement: .primaryAction) {
           ListeningStatusView(detailed: true)
         }
-        .sharedBackgroundVisibility(.hidden)
+      }
+      // Export and the inspector are icon buttons like the ones on the left, so all of them are the same size
+      ToolbarItem(placement: .primaryAction) {
+        Button { showExport = true } label: {
+          Label("Export…", systemImage: "square.and.arrow.up")
+        }
+        .disabled(selectedBook == nil)
+        .help("Export the comments as Markdown, a review draft or an annotated PDF (⌘E)")
       }
       ToolbarItem(placement: .primaryAction) {
-        Button("Export…") { showExport = true }
-          .disabled(selectedBook == nil)
-          .help("Export the comments as Markdown, a review draft or an annotated PDF (⌘E)")
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Toggle(isOn: $showInspector) {
+        // a button, not a toggle: a toggle fills itself with the accent colour while the inspector is open
+        Button { showInspector.toggle() } label: {
           Label("Comments", systemImage: "sidebar.trailing")
         }
-        .toggleStyle(.button)
         .help(showInspector ? "Hide the comments inspector (⌥⌘I)" : "Show the comments inspector (⌥⌘I)")
-        .accessibilityLabel("Comments inspector")
+        .accessibilityLabel(showInspector ? "Hide comments" : "Show comments")
       }
     }
     .focusedSceneValue(\.commentsInspectorShown, $showInspector)
@@ -254,7 +257,8 @@ private struct WindowTitle: View {
         ChaptersView(book: book).frame(width: 420, height: 520)
       }
       .foregroundStyle(Theme.textPrimary)
-      .frame(maxWidth: 520, alignment: .leading)
+      // narrow enough that the buttons on the right never move into the overflow menu
+      .frame(maxWidth: 380, alignment: .leading)
       .fixedSize(horizontal: false, vertical: true)
     } else {
       Text("Klopfgeist")

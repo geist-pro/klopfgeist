@@ -297,6 +297,9 @@ private struct ThemedList: ViewModifier {
     content
       #if os(iOS)
         .listStyle(.plain)
+      #else
+        // without it a Mac Form lays out in columns: labels clipped, section titles as rows
+        .formStyle(.grouped)
       #endif
       .scrollContentBackground(.hidden)
       .background(Theme.background)
@@ -308,10 +311,47 @@ private struct ThemedList: ViewModifier {
       .preferredColorScheme(ThemeStore.shared.palette.isDark ? .dark : .light)
       .environment(\.colorScheme, ThemeStore.shared.palette.isDark ? .dark : .light)
       #if os(macOS)
-        // the title and button rows of a Mac sheet
+        // the title row of a Mac sheet (its button row is `sheetButtons`)
         .toolbarBackground(Theme.background, for: .automatic)
         .toolbarBackgroundVisibility(.visible, for: .automatic)
       #endif
+  }
+}
+
+private struct SheetButtons: ViewModifier {
+  let cancel: String?
+  let confirm: String?
+  let confirmDisabled: Bool
+  let onCancel: () -> Void
+  let onConfirm: () -> Void
+
+  func body(content: Content) -> some View {
+    #if os(macOS)
+      content.safeAreaInset(edge: .bottom, spacing: 0) {
+        VStack(spacing: 0) {
+          ThemedDivider()
+          HStack(spacing: 10) {
+            Spacer()
+            if let cancel { Button(cancel, action: onCancel).keyboardShortcut(.cancelAction) }
+            if let confirm {
+              Button(confirm, action: onConfirm)
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(confirmDisabled)
+            }
+          }
+          .controlSize(.large)
+          .padding(.horizontal, 20)
+          .padding(.vertical, 14)
+        }
+        .background(Theme.background)
+      }
+    #else
+      content.toolbar {
+        if let cancel { ToolbarItem(placement: .cancellationAction) { Button(cancel, action: onCancel) } }
+        if let confirm { ToolbarItem(placement: .confirmationAction) { Button(confirm, action: onConfirm).disabled(confirmDisabled) } }
+      }
+    #endif
   }
 }
 
@@ -355,6 +395,13 @@ extension View {
   func themedList() -> some View { modifier(ThemedList()) }
   /// Apply to a Section or ForEach inside a themed list.
   func themedRows() -> some View { modifier(ThemedRows()) }
+
+  /// The Cancel/Done row of a sheet. iOS: buttons in the navigation bar. Mac: a row at the bottom
+  /// drawn in the theme, since the system's own button bar stays grey whatever the theme.
+  func sheetButtons(cancel: String? = nil, confirm: String? = nil, confirmDisabled: Bool = false,
+                    onCancel: @escaping () -> Void = {}, onConfirm: @escaping () -> Void = {}) -> some View {
+    modifier(SheetButtons(cancel: cancel, confirm: confirm, confirmDisabled: confirmDisabled, onCancel: onCancel, onConfirm: onConfirm))
+  }
 
   func cardSurface(padding: CGFloat = Theme.cardPadding) -> some View {
     modifier(CardSurface(padding: padding))

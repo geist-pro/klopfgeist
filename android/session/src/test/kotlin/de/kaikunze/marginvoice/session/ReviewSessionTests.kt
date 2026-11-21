@@ -349,6 +349,17 @@ class ReviewSessionTests {
         assertEquals(ListenState.Listening, rig.session.listenState)
     }
 
+    @Test fun turningVoiceCommandsOnAsksForTheMicrophone() = runTest {
+        val rig = Rig(backgroundScope, settings = SessionSettings(voiceCommandsEnabled = false))
+        rig.capture.microphonePermission = MicrophonePermission.UNDETERMINED
+        rig.open()
+        assertEquals(ListenState.Off, rig.session.listenState)
+        rig.session.settings = SessionSettings(voiceCommandsEnabled = true)
+        rig.session.idle()
+        assertEquals(MicrophonePermission.GRANTED, rig.capture.microphonePermission)
+        assertEquals(ListenState.Listening, rig.session.listenState)
+    }
+
     @Test fun voiceCommandsOffStillRecordsByButton() = runTest {
         val settings = SessionSettings(voiceCommandsEnabled = false)
         val rig = Rig(backgroundScope, settings = settings)

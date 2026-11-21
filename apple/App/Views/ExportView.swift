@@ -156,9 +156,7 @@ struct ExportView: View {
       }
       .navigationTitle("Export")
       .inlineNavigationTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
-      }
+      .sheetButtons(cancel: "Close", onCancel: { dismiss() })
       .task(id: BuildKey(options: options, sourcePDF: sourcePDF)) { await build() }
       .onAppear { sourcePDF = ExportBuilder.sourcePDF(of: book, store: store) }
       .fileImporter(isPresented: $pickingPDF, allowedContentTypes: [.pdf]) { result in

@@ -118,7 +118,15 @@ class ReviewSession(
             field = value
             if (value == oldValue || book == null) return
             if (value.commandLanguage != oldValue.commandLanguage) languageChanged = true
-            if (value.voiceCommandsEnabled && !oldValue.voiceCommandsEnabled) isListeningPaused = false
+            if (value.voiceCommandsEnabled && !oldValue.voiceCommandsEnabled) {
+                isListeningPaused = false
+                // turned on with the microphone never asked for: ask now, or listening silently stays off
+                permission = capture.microphonePermission
+                if (permission == MicrophonePermission.UNDETERMINED) {
+                    askForMicrophone()
+                    return
+                }
+            }
             replan()
         }
 
@@ -243,9 +251,21 @@ class ReviewSession(
      * recording that was starting has started).
      */
     suspend fun idle() {
-        while (pump != null || recordingTask != null) {
+        while (pump != null || recordingTask != null || permissionTask != null) {
+            permissionTask?.join()
             pump?.join()
             recordingTask?.join()
+        }
+    }
+
+    private var permissionTask: Job? = null
+
+    private fun askForMicrophone() {
+        if (permissionTask != null) return
+        permissionTask = scope.launch {
+            permission = if (capture.requestMicrophonePermission()) MicrophonePermission.GRANTED else MicrophonePermission.DENIED
+            permissionTask = null
+            replan()
         }
     }
 

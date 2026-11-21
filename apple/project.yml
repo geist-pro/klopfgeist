@@ -138,6 +138,8 @@ targets:
       base:
         # same bundle ID as the iOS app: one App Store record, universal purchase
         PRODUCT_BUNDLE_IDENTIFIER: pro.geist.klopfgeist
+        # MVCatchException (AppMac/ObjCException.m): CoreML exceptions in the Kokoro voice
+        SWIFT_OBJC_BRIDGING_HEADER: AppMac/MarginVoiceMac-Bridging-Header.h
         # the Finder shows the file name: Klopfgeist.app, while the Swift module keeps the target's name
         PRODUCT_NAME: Klopfgeist
         PRODUCT_MODULE_NAME: MarginVoiceMac

@@ -50,11 +50,9 @@ struct StatusPill: View {
     .font(compact ? .callout.weight(.medium) : .subheadline.weight(.semibold))
     .lineLimit(1)
     .foregroundStyle(tint)
-    .padding(.horizontal, compact ? 10 : 0)
-    .padding(.vertical, compact ? 4 : 0)
+    // on the Mac toolbar the system's glass capsule is the shape, as for every other button there
+    .padding(.horizontal, compact ? 6 : 0)
     .frame(minHeight: compact ? nil : 44)
-    .background(compact ? tint.opacity(0.14) : .clear, in: .capsule)
-    .overlay { if compact { Capsule().stroke(tint.opacity(0.45), lineWidth: 1) } }
     .contentShape(.rect)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(label)

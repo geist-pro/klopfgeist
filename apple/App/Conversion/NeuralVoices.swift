@@ -164,10 +164,12 @@ actor NeuralSpeechHost {
   enum HostError: LocalizedError {
     case unavailable
     case missingReference(String)
+    case voiceFailed
     var errorDescription: String? {
       switch self {
       case .unavailable: "Neural voices are not part of this build."
       case .missingReference(let name): "The reference recording for the voice “\(name)” is missing from the app."
+      case .voiceFailed: "The voice could not speak many words of this document. Try another voice, or a system voice."
       }
     }
   }
@@ -220,8 +222,41 @@ actor NeuralSpeechHost {
       #endif
     }
     loadedModelID = voice.modelID
+    #if os(macOS) && canImport(KokoroTTS)
+      skippedWords = 0
+    #endif
     Self.log.info("loaded \(voice.modelID, privacy: .public)")
   }
+
+  #if os(macOS) && canImport(KokoroTTS)
+    /// Words skipped because the voice could not speak them, since the model was loaded.
+    private var skippedWords = 0
+
+    /// Kokoro, with CoreML's Objective-C exceptions caught: on one, the text is spoken in halves, down to
+    /// single words, and a word that still fails becomes a short pause. Without this the whole app
+    /// crashed in the middle of a long conversion (and the half-made book was gone).
+    private func kokoroGuarded(_ kokoro: KokoroTTSModel, _ text: String, voice: NeuralVoice) throws -> [Float] {
+      var audio: [Float] = []
+      var failure: Error?
+      let exception = MVCatchException {
+        do { audio = try kokoro.synthesize(text: text, voice: voice.preset, language: voice.language) } catch { failure = error }
+      }
+      if let failure { throw failure }
+      guard let exception else { return audio }
+      let words = text.split(whereSeparator: \.isWhitespace)
+      Self.log.error("voice failed (\(exception.name.rawValue, privacy: .public): \(exception.reason ?? "", privacy: .public)) on \(words.count) words")
+      if words.count <= 1 {
+        skippedWords += 1
+        // more than a few: the model is broken, not one odd word, and the book would be full of holes
+        if skippedWords > 25 { throw HostError.voiceFailed }
+        return [Float](repeating: 0, count: Int(NeuralVoiceCatalog.sampleRate * 0.25))
+      }
+      let half = words.count / 2
+      let gap = [Float](repeating: 0, count: Int(NeuralVoiceCatalog.sampleRate * 0.05))
+      return try kokoroGuarded(kokoro, words[..<half].joined(separator: " "), voice: voice) + gap
+        + kokoroGuarded(kokoro, words[half...].joined(separator: " "), voice: voice)
+    }
+  #endif
 
   /// Frees the model's memory (after a conversion).
   func unload() {
@@ -242,7 +277,11 @@ actor NeuralSpeechHost {
     case .kokoro:
       #if canImport(KokoroTTS)
         guard let kokoro else { throw HostError.unavailable }
-        return try kokoro.synthesize(text: text, voice: voice.preset, language: voice.language)
+        #if os(macOS)
+          return try kokoroGuarded(kokoro, text, voice: voice)
+        #else
+          return try kokoro.synthesize(text: text, voice: voice.preset, language: voice.language)
+        #endif
       #else
         throw HostError.unavailable
       #endif

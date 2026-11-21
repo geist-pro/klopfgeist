@@ -338,6 +338,21 @@ struct ReviewSessionTests {
     #expect(rig.session.listenState == .listening)
   }
 
+  @Test func turningVoiceCommandsOnAsksForTheMicrophone() async {
+    // the Mac starts with voice commands off, so opening a book never asked
+    var settings = SessionSettings()
+    settings.voiceCommandsEnabled = false
+    let rig = Rig(settings: settings)
+    rig.capture.microphonePermission = .undetermined
+    await rig.open()
+    #expect(rig.session.listenState == .off)
+    settings.voiceCommandsEnabled = true
+    rig.session.settings = settings
+    await rig.session.idle()
+    #expect(rig.capture.microphonePermission == .granted)
+    #expect(rig.session.listenState == .listening)
+  }
+
   @Test func voiceCommandsOffStillRecordsByButton() async {
     var settings = SessionSettings()
     settings.voiceCommandsEnabled = false

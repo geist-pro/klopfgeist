@@ -33,13 +33,9 @@ struct ConvertView: View {
       }
       .navigationTitle("New Audiobook")
       .inlineNavigationTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Create") { create() }
-            .disabled(draft == nil || draft?.plan.utterances.isEmpty == true)
-        }
-      }
+      .sheetButtons(
+        cancel: "Cancel", confirm: "Create", confirmDisabled: draft == nil || draft?.plan.utterances.isEmpty == true,
+        onCancel: { dismiss() }, onConfirm: { create() })
     }
     .task {
       do {

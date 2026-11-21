@@ -88,6 +88,9 @@ struct MacLibrarySidebar: View {
           }
           Button("Sample Papers…", systemImage: "headphones") { showSamples = true }
         }
+        // a round button like its neighbours, not a wider one with a chevron
+        .menuIndicator(.hidden)
+        .help("Convert a document, import an audiobook or try a sample paper")
       }
     }
     .confirmationDialog(
