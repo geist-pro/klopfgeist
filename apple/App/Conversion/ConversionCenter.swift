@@ -66,6 +66,21 @@ final class ConversionCenter {
   init(store: BookStore, settings: AppSettings) {
     self.store = store
     self.settings = settings
+    // conversions still marked as running were cut off when the app quit or crashed: say so,
+    // since their half-made folders are removed at launch and the book would just be missing
+    interrupted = UserDefaults.standard.stringArray(forKey: Self.runningKey) ?? []
+    UserDefaults.standard.removeObject(forKey: Self.runningKey)
+  }
+
+  private static let runningKey = "conversionsRunning"
+
+  /// Titles of conversions the last run did not finish; the window tells the user once.
+  var interrupted: [String] = []
+
+  private func markRunning(_ title: String, _ running: Bool) {
+    var list = UserDefaults.standard.stringArray(forKey: Self.runningKey) ?? []
+    if running { list.append(title) } else if let i = list.firstIndex(of: title) { list.remove(at: i) }
+    UserDefaults.standard.set(list, forKey: Self.runningKey)
   }
 
   /// Running and failed conversions (finished ones show up as books instead).
@@ -122,6 +137,7 @@ final class ConversionCenter {
 
   func start(_ draft: Draft, voiceIdentifier: String?, context: ModelContext) {
     var job = Job(title: draft.title)
+    markRunning(draft.title, true)
     let neural = NeuralVoiceCatalog.voice(id: voiceIdentifier)
     job.phase = neural == nil ? .speaking : .preparingVoice
     jobs.insert(job, at: 0)
@@ -212,6 +228,7 @@ final class ConversionCenter {
 
   private func finish(_ id: UUID, phase: Job.Phase, taskID: String?, success: Bool) {
     if let i = jobs.firstIndex(where: { $0.id == id }) {
+      markRunning(jobs[i].title, false)
       jobs[i].phase = phase
       if success { jobs[i].progress = 1 }
       // the row changes or turns into a book without a sound

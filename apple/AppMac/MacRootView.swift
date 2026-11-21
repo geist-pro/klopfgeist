@@ -19,6 +19,7 @@ struct MacRootView: View {
   @State private var importError: String?
   @State private var isDropTarget = false
   @Environment(BookStore.self) private var store
+  @Environment(ConversionCenter.self) private var conversions
   @Environment(SessionHost.self) private var session
   @Environment(AppSettings.self) private var settings
   @Environment(\.modelContext) private var context
@@ -122,6 +123,14 @@ struct MacRootView: View {
       Button("OK") {}
     } message: {
       Text(session.errorMessage ?? "")
+    }
+    .alert(
+      conversions.interrupted.count == 1 ? "A Conversion Was Interrupted" : "Conversions Were Interrupted",
+      isPresented: Binding(get: { !conversions.interrupted.isEmpty }, set: { if !$0 { conversions.interrupted = [] } })
+    ) {
+      Button("OK") {}
+    } message: {
+      Text("Klopfgeist quit before it finished \(conversions.interrupted.map { "“\($0)”" }.joined(separator: ", ")). Convert the document again with ⌘N.")
     }
     .alert("Import Failed", isPresented: Binding(presenting: $importError)) {
       Button("OK") {}
