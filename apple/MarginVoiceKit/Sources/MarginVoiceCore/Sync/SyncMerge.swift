@@ -8,7 +8,9 @@ import Foundation
 /// - changed on one side only: that side wins;
 /// - changed on both: the newer `updatedAt` wins (ties: the larger hash, so every device picks the same);
 /// - deleted on one side, unchanged on the other: deleted;
-/// - deleted on one side, edited on the other: the edit survives (no comment is lost).
+/// - deleted on one side, edited on the other: the edit survives (no comment is lost);
+/// - in the store but unreadable (`unreadable`: a newer format, a damaged or half-uploaded file, a folder
+///   that is missing): left alone on both sides. Absence that is only an unreadable file is not a deletion.
 public enum SyncMerge {
   public struct Item<T: Sendable>: Sendable {
     public let value: T
@@ -36,11 +38,18 @@ public enum SyncMerge {
     public let base: [String: String]
   }
 
-  public static func merge<T>(base: [String: String], local: [String: Item<T>], remote: [String: Item<T>]) -> Result<T> {
+  public static func merge<T>(
+    base: [String: String], local: [String: Item<T>], remote: [String: Item<T>], unreadable: Set<String> = []
+  ) -> Result<T> {
     var actions: [Action<T>] = []
     var next: [String: String] = [:]
     for id in Set(base.keys).union(local.keys).union(remote.keys).sorted() {
       let b = base[id]
+      if unreadable.contains(id) && remote[id] == nil {
+        // keep what both sides agreed on last time, so a readable copy later merges as usual
+        if let b { next[id] = b }
+        continue
+      }
       switch (local[id], remote[id]) {
       case (nil, nil):
         break

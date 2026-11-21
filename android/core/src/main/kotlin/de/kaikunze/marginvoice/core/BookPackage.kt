@@ -44,8 +44,20 @@ object BookPackage {
     fun encode(comment: PackagedComment): String = json.encodeToString(PackagedComment.serializer(), comment)
     fun decodeBook(s: String): PackagedBook = json.decodeFromString(PackagedBook.serializer(), s).also {
         require(it.format <= FORMAT) { "the book was written by a newer Klopfgeist (format ${it.format})" }
+        listOfNotNull(it.audioFile, it.textFile, it.timingFile, it.sourceFile).forEach(::checkFileName)
     }
-    fun decodeComment(s: String): PackagedComment = json.decodeFromString(PackagedComment.serializer(), s)
+    fun decodeComment(s: String): PackagedComment =
+        json.decodeFromString(PackagedComment.serializer(), s).also { c -> c.audioFile?.let(::checkFileName) }
+
+    /**
+     * The file names in a package or in the sync store become paths inside the book's folder: a shared
+     * `.drafttalk` or a server must not reach outside it ("../book.m4a", "../<other book>/…").
+     */
+    fun checkFileName(name: String) {
+        require(name.isNotEmpty() && name != "." && name != ".." && '/' !in name && '\\' !in name && '\u0000' !in name) {
+            "the book names a file outside its folder ($name)"
+        }
+    }
 
     private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
     fun date(i: Instant): String = dateFormat.format(i)

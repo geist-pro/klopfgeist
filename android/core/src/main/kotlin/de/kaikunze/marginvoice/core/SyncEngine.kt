@@ -63,9 +63,9 @@ class SyncEngine(private val folder: SyncFolder, private val local: SyncLocal, p
         cache = HashMap()
         uploaded = 0; downloaded = 0; deleted = 0
 
-        val remoteBooks = remoteBooks(state)
+        val (remoteBooks, unreadable) = remoteBooks(state)
         val localBooks = local.books().associateBy { it.id.uppercase() }
-        val merged = SyncMerge.merge(state.books, localBooks.mapValues { item(it.value) }, remoteBooks.mapValues { item(it.value) })
+        val merged = SyncMerge.merge(state.books, localBooks.mapValues { item(it.value) }, remoteBooks.mapValues { item(it.value) }, unreadable)
         val removed = HashSet<String>()
         for (action in merged.actions) when (action) {
             is Action.PutRemote -> uploadBook(action.value)
@@ -95,16 +95,28 @@ class SyncEngine(private val folder: SyncFolder, private val local: SyncLocal, p
         return s
     }
 
-    private suspend fun remoteBooks(state: SyncState): Map<String, PackagedBook> {
+    /**
+     * The books in the store, and the ids of those that are there but cannot be read: their absence from the
+     * first is no deletion. A missing `Books` folder (moved on the server) makes every book known from the
+     * last sync unreadable rather than deleted.
+     */
+    private suspend fun remoteBooks(state: SyncState): Pair<Map<String, PackagedBook>, Set<String>> {
         val result = HashMap<String, PackagedBook>()
-        for (dir in folder.list(BOOKS).orEmpty().filter { it.isFolder }) {
+        val unreadable = HashSet<String>()
+        val dirs = folder.list(BOOKS) ?: run {
+            if (state.books.isNotEmpty()) log("the Books folder is missing in the store: nothing is deleted")
+            return result to state.books.keys
+        }
+        for (dir in dirs.filter { it.isFolder }) {
             // a book without book.json is still being uploaded
-            val meta = folder.list("$BOOKS/${dir.name}")?.firstOrNull { it.name == BookPackage.BOOK_FILE } ?: continue
+            val meta = folder.list("$BOOKS/${dir.name}")?.firstOrNull { it.name == BookPackage.BOOK_FILE }
+            if (meta == null) { unreadable.add(dir.name.uppercase()); continue }
             val book = runCatching { BookPackage.decodeBook(json("$BOOKS/${dir.name}/${meta.name}", meta.tag, state)) }
-                .onFailure { log("skipping ${dir.name}: ${it.message}") }.getOrNull() ?: continue
+                .onFailure { log("skipping ${dir.name}: ${it.message}") }.getOrNull()
+            if (book == null) { unreadable.add(dir.name.uppercase()); continue }
             result[book.id.uppercase()] = book
         }
-        return result
+        return result to unreadable
     }
 
     private suspend fun fetch(path: String, dest: File) {
@@ -127,16 +139,20 @@ class SyncEngine(private val folder: SyncFolder, private val local: SyncLocal, p
 
     private suspend fun syncComments(bookId: String, base: Map<String, String>, state: SyncState): Map<String, String> {
         val dir = "${bookPath(bookId)}/${BookPackage.COMMENTS_DIR}"
-        val listing = folder.list(dir).orEmpty()
+        val found = folder.list(dir)
+        val listing = found.orEmpty()
         val names = listing.map { it.name }.toMutableSet()
         val remote = HashMap<String, PackagedComment>()
+        // no comments folder although comments were synced before: unreadable, not deleted
+        val unreadable = if (found == null) base.keys.toMutableSet() else HashSet()
         for (f in listing.filter { !it.isFolder && it.name.endsWith(".json") }) {
             val c = runCatching { BookPackage.decodeComment(json("$dir/${f.name}", f.tag, state)) }
-                .onFailure { log("skipping comment ${f.name}: ${it.message}") }.getOrNull() ?: continue
+                .onFailure { log("skipping comment ${f.name}: ${it.message}") }.getOrNull()
+            if (c == null) { unreadable.add(f.name.removeSuffix(".json").uppercase()); continue }
             remote[c.id.uppercase()] = c
         }
         val localComments = local.comments(bookId).associateBy { it.id.uppercase() }
-        val merged = SyncMerge.merge(base, localComments.mapValues { item(it.value) }, remote.mapValues { item(it.value) })
+        val merged = SyncMerge.merge(base, localComments.mapValues { item(it.value) }, remote.mapValues { item(it.value) }, unreadable)
         for (action in merged.actions) when (action) {
             is Action.PutRemote -> {
                 val c = action.value

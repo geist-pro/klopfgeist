@@ -11,7 +11,9 @@ import java.time.Instant
  * - changed on one side only: that side wins;
  * - changed on both: the newer `updatedAt` wins (ties: the larger hash, so every device picks the same);
  * - deleted on one side, unchanged on the other: deleted;
- * - deleted on one side, edited on the other: the edit survives (no comment is lost).
+ * - deleted on one side, edited on the other: the edit survives (no comment is lost);
+ * - in the store but unreadable (`unreadable`: a newer format, a damaged or half-uploaded file, a folder
+ *   that is missing): left alone on both sides. Absence that is only an unreadable file is not a deletion.
  */
 object SyncMerge {
     data class Item<T>(val value: T, val hash: String, val updatedAt: Instant)
@@ -26,11 +28,18 @@ object SyncMerge {
 
     data class Result<T>(val actions: List<Action<T>>, val base: Map<String, String>)
 
-    fun <T> merge(base: Map<String, String>, local: Map<String, Item<T>>, remote: Map<String, Item<T>>): Result<T> {
+    fun <T> merge(
+        base: Map<String, String>, local: Map<String, Item<T>>, remote: Map<String, Item<T>>, unreadable: Set<String> = emptySet(),
+    ): Result<T> {
         val actions = ArrayList<Action<T>>()
         val next = HashMap<String, String>()
         for (id in (base.keys + local.keys + remote.keys).sorted()) {
             val b = base[id]
+            if (id in unreadable && remote[id] == null) {
+                // keep what both sides agreed on last time, so a readable copy later merges as usual
+                if (b != null) next[id] = b
+                continue
+            }
             val l = local[id]
             val r = remote[id]
             when {

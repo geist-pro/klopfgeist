@@ -131,4 +131,12 @@ class SyncMergeTests {
         assertEquals("h-b", a.base["c"])
         assertEquals("h-b", b.base["c"])
     }
+
+    @Test fun fileNamesThatLeaveTheBookFolderAreRefused() {
+        val book = """{"addedAt":"2026-10-29T10:00:00.000Z","audioFile":"../other/book.m4b","duration":1,"format":1,"id":"X","title":"t","updatedAt":"2026-10-29T10:00:00.000Z"}"""
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { BookPackage.decodeBook(book) }
+        val comment = """{"audioFile":"../book.m4a","createdAt":"2026-10-29T10:00:00.000Z","id":"A","kind":"comment","mediaTime":1,"updatedAt":"2026-10-29T10:00:00.000Z"}"""
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { BookPackage.decodeComment(comment) }
+        for (ok in listOf("book.m4b", "comment-1A2B.m4a", "My Paper (final).m4b")) BookPackage.checkFileName(ok)
+    }
 }

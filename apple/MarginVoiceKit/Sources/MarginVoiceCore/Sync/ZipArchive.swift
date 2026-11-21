@@ -95,17 +95,20 @@ public enum ZipArchive {
       i -= 1
     }
     guard eocd >= 0 else { throw ZipError.malformed("no central directory") }
-    let count = Int(data.u16(eocd + 10))
-    var p = Int(data.u32(eocd + 16))
+    // every offset and length below comes from the file: read them checked, so a damaged or hostile
+    // package is an error, not a crash (BookStore imports the inbox at launch)
+    let count = Int(try data.checked16(eocd + 10))
+    var p = Int(try data.checked32(eocd + 16))
     for _ in 0..<count {
-      guard data.u32(p) == 0x0201_4b50 else { throw ZipError.malformed("central directory") }
-      let method = data.u16(p + 10)
-      let compressed = Int(data.u32(p + 20))
-      let size = Int(data.u32(p + 24))
-      let nameLength = Int(data.u16(p + 28))
-      let extra = Int(data.u16(p + 30))
-      let comment = Int(data.u16(p + 32))
-      let localOffset = Int(data.u32(p + 42))
+      guard try data.checked32(p) == 0x0201_4b50 else { throw ZipError.malformed("central directory") }
+      let method = try data.checked16(p + 10)
+      let compressed = Int(try data.checked32(p + 20))
+      let size = Int(try data.checked32(p + 24))
+      let nameLength = Int(try data.checked16(p + 28))
+      let extra = Int(try data.checked16(p + 30))
+      let comment = Int(try data.checked16(p + 32))
+      let localOffset = Int(try data.checked32(p + 42))
+      guard p + 46 + nameLength <= data.count else { throw ZipError.malformed("central directory") }
       let name = String(decoding: data[data.startIndex + p + 46..<data.startIndex + p + 46 + nameLength], as: UTF8.self)
       p += 46 + nameLength + extra + comment
 
@@ -115,9 +118,13 @@ public enum ZipArchive {
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         continue
       }
-      guard data.u32(localOffset) == 0x0403_4b50 else { throw ZipError.malformed("local header of \(name)") }
-      let start = localOffset + 30 + Int(data.u16(localOffset + 26)) + Int(data.u16(localOffset + 28))
+      guard try data.checked32(localOffset) == 0x0403_4b50 else { throw ZipError.malformed("local header of \(name)") }
+      let start = localOffset + 30 + Int(try data.checked16(localOffset + 26)) + Int(try data.checked16(localOffset + 28))
       guard start + compressed <= data.count else { throw ZipError.malformed("\(name) is cut off") }
+      // DEFLATE expands at most about 1032:1; a larger claimed size would only allocate memory for nothing
+      guard method == 0 ? size == compressed : size <= compressed * 1100 + 1024 else {
+        throw ZipError.malformed("\(name) has an impossible size")
+      }
       let body = data[data.startIndex + start..<data.startIndex + start + compressed]
       let contents: Data
       switch method {
@@ -187,5 +194,13 @@ extension Data {
   }
   fileprivate func u32(_ i: Int) -> UInt32 {
     UInt32(u16(i)) | UInt32(u16(i + 2)) << 16
+  }
+  fileprivate func checked16(_ i: Int) throws -> UInt16 {
+    guard i >= 0, i + 2 <= count else { throw ZipArchive.ZipError.malformed("offset \(i) is outside the file") }
+    return u16(i)
+  }
+  fileprivate func checked32(_ i: Int) throws -> UInt32 {
+    guard i >= 0, i + 4 <= count else { throw ZipArchive.ZipError.malformed("offset \(i) is outside the file") }
+    return u32(i)
   }
 }

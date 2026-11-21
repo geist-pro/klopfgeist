@@ -88,10 +88,11 @@ public actor SyncEngine {
     downloaded = 0
     deleted = 0
 
-    let remoteBooks = try await remoteBooks(state)
+    let (remoteBooks, unreadable) = try await remoteBooks(state)
     let localBooks = Dictionary(try await local.books().map { ($0.id.uppercased(), $0) }, uniquingKeysWith: { a, _ in a })
     let merged = SyncMerge.merge(
-      base: state.books, local: localBooks.mapValues(Self.item), remote: remoteBooks.mapValues(Self.item))
+      base: state.books, local: localBooks.mapValues(Self.item), remote: remoteBooks.mapValues(Self.item),
+      unreadable: unreadable)
     var removed = Set<String>()
     for action in merged.actions {
       switch action {
@@ -144,21 +145,31 @@ public actor SyncEngine {
     return data
   }
 
-  func remoteBooks(_ state: SyncState) async throws -> [String: PackagedBook] {
+  /// The books in the store, and the ids of those that are there but cannot be read: their absence from the
+  /// first is no deletion. A missing `Books` folder (moved on the server, an iCloud container still filling)
+  /// makes every book known from the last sync unreadable rather than deleted.
+  func remoteBooks(_ state: SyncState) async throws -> ([String: PackagedBook], Set<String>) {
     var result: [String: PackagedBook] = [:]
-    for dir in try await folder.list(Self.books) ?? [] where dir.isFolder {
+    var unreadable = Set<String>()
+    guard let dirs = try await folder.list(Self.books) else {
+      if !state.books.isEmpty { log("the Books folder is missing in the store: nothing is deleted") }
+      return (result, Set(state.books.keys))
+    }
+    for dir in dirs where dir.isFolder {
       // a book without book.json is still being uploaded
       guard let meta = try await folder.list("\(Self.books)/\(dir.name)")?.first(where: { $0.name == BookPackage.bookFile }) else {
+        unreadable.insert(dir.name.uppercased())
         continue
       }
       do {
         let book = try BookPackage.decodeBook(try await json("\(Self.books)/\(dir.name)/\(meta.name)", tag: meta.tag, state: state))
         result[book.id.uppercased()] = book
       } catch {
+        unreadable.insert(dir.name.uppercased())
         log("skipping \(dir.name): \(error.localizedDescription)")
       }
     }
-    return result
+    return (result, unreadable)
   }
 
   /// Files first and `book.json` last, so other devices never see half a book.
@@ -175,20 +186,25 @@ public actor SyncEngine {
 
   func syncComments(bookID: String, base: [String: String], state: SyncState) async throws -> [String: String] {
     let dir = "\(Self.bookPath(bookID))/\(BookPackage.commentsDirectory)"
-    let listing = try await folder.list(dir) ?? []
+    let found = try await folder.list(dir)
+    let listing = found ?? []
     var names = Set(listing.map(\.name))
     var remote: [String: PackagedComment] = [:]
+    // no comments folder although comments were synced before: unreadable, not deleted
+    var unreadable = found == nil ? Set(base.keys) : []
     for f in listing where !f.isFolder && f.name.hasSuffix(".json") {
       do {
         let c = try BookPackage.decodeComment(try await json("\(dir)/\(f.name)", tag: f.tag, state: state))
         remote[c.id.uppercased()] = c
       } catch {
+        unreadable.insert(String(f.name.dropLast(5)).uppercased())
         log("skipping comment \(f.name): \(error.localizedDescription)")
       }
     }
     let localComments = Dictionary(
       try await local.comments(bookID: bookID).map { ($0.id.uppercased(), $0) }, uniquingKeysWith: { a, _ in a })
-    let merged = SyncMerge.merge(base: base, local: localComments.mapValues(Self.item), remote: remote.mapValues(Self.item))
+    let merged = SyncMerge.merge(
+      base: base, local: localComments.mapValues(Self.item), remote: remote.mapValues(Self.item), unreadable: unreadable)
     for action in merged.actions {
       switch action {
       case .putRemote(_, let c):

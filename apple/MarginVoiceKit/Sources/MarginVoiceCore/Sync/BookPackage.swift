@@ -22,11 +22,13 @@ public enum BookPackage {
   public enum PackageError: Error, LocalizedError {
     case newerFormat(Int)
     case notABook
+    case badFileName(String)
 
     public var errorDescription: String? {
       switch self {
       case .newerFormat(let f): "The book was written by a newer Klopfgeist (format \(f))."
       case .notABook: "Not a Klopfgeist book: \(BookPackage.bookFile) is missing."
+      case .badFileName(let name): "The book names a file outside its folder (\(name))."
       }
     }
   }
@@ -45,11 +47,22 @@ public enum BookPackage {
   public static func decodeBook(_ data: Data) throws -> PackagedBook {
     let book = try JSONDecoder().decode(PackagedBook.self, from: data)
     if book.format > format { throw PackageError.newerFormat(book.format) }
+    for name in [book.audioFile, book.textFile, book.timingFile, book.sourceFile].compactMap({ $0 }) { try checkFileName(name) }
     return book
   }
 
   public static func decodeComment(_ data: Data) throws -> PackagedComment {
-    try JSONDecoder().decode(PackagedComment.self, from: data)
+    let comment = try JSONDecoder().decode(PackagedComment.self, from: data)
+    if let name = comment.audioFile { try checkFileName(name) }
+    return comment
+  }
+
+  /// The file names in a package or in the sync store become paths inside the book's folder: a shared
+  /// `.drafttalk` or a server must not reach outside it ("../book.m4a", "../<other book>/…").
+  public static func checkFileName(_ name: String) throws {
+    if name.isEmpty || name == "." || name == ".." || name.contains("/") || name.contains("\\") || name.contains("\0") {
+      throw PackageError.badFileName(name)
+    }
   }
 
   nonisolated(unsafe) static let dateFormatter: ISO8601DateFormatter = {

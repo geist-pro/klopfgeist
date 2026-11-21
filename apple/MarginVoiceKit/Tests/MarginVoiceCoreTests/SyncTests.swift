@@ -73,11 +73,44 @@ struct BookPackageTests {
     #expect(BookPackage.date("2026-10-29T10:05:00Z") > Date.distantPast)
   }
 
+  @Test func damagedZipsAreErrorsNotCrashes() throws {
+    let dir = tempDir("damaged")
+    let good = dir.appendingPathComponent("good.zip")
+    try ZipArchive.write([.text("book.json", "{}"), .text("narration.txt", String(repeating: "word ", count: 200))], to: good)
+    let bytes = try Data(contentsOf: good)
+    let eocd = bytes.count - 22
+    func damaged(_ change: (inout Data) -> Void) throws -> URL {
+      var d = bytes
+      change(&d)
+      let url = dir.appendingPathComponent(UUID().uuidString + ".zip")
+      try d.write(to: url)
+      return url
+    }
+    func put32(_ d: inout Data, _ at: Int, _ v: UInt32) { for k in 0..<4 { d[at + k] = UInt8((v >> (8 * UInt32(k))) & 0xFF) } }
+    let cases = [
+      try damaged { put32(&$0, eocd + 16, 0xFFFF_FFFF) },  // central directory offset past the end (also the ZIP64 marker)
+      try damaged { put32(&$0, eocd + 16, UInt32($0.count - 30)) },  // central directory too close to the end
+      try damaged { $0[eocd + 10] = 0xFF; $0[eocd + 11] = 0xFF },  // more entries than there are
+      try damaged { $0.removeLast(30) },  // cut off
+    ]
+    for url in cases {
+      #expect(throws: ZipArchive.ZipError.self) { try ZipArchive.unzip(url, into: dir.appendingPathComponent(UUID().uuidString)) }
+    }
+  }
+
   @Test func unzipRefusesPathsOutsideTheFolder() throws {
     let dir = tempDir("evil")
     let zip = dir.appendingPathComponent("evil.zip")
     try ZipArchive.write([.text("../evil.txt", "x")], to: zip)
     #expect(throws: ZipArchive.ZipError.self) { try ZipArchive.unzip(zip, into: dir.appendingPathComponent("out")) }
+  }
+
+  @Test func fileNamesThatLeaveTheBookFolderAreRefused() throws {
+    let book = #"{"addedAt":"2026-10-29T10:00:00.000Z","audioFile":"../other/book.m4b","duration":1,"format":1,"id":"X","title":"t","updatedAt":"2026-10-29T10:00:00.000Z"}"#
+    #expect(throws: BookPackage.PackageError.self) { try BookPackage.decodeBook(Data(book.utf8)) }
+    let comment = #"{"audioFile":"../book.m4a","createdAt":"2026-10-29T10:00:00.000Z","id":"A","kind":"comment","mediaTime":1,"updatedAt":"2026-10-29T10:00:00.000Z"}"#
+    #expect(throws: BookPackage.PackageError.self) { try BookPackage.decodeComment(Data(comment.utf8)) }
+    for ok in ["book.m4b", "comment-1A2B.m4a", "My Paper (final).m4b"] { #expect(throws: Never.self) { try BookPackage.checkFileName(ok) } }
   }
 
   @Test func newerFormatIsRefused() throws {
@@ -158,13 +191,15 @@ struct SyncMergeTests {
 /// A store in memory: path → bytes, the tag is a write counter.
 actor MemoryFolder: SyncFolder {
   var files: [String: (Data, Int)] = [:]
+  /// Folders stay when their last file goes, as on WebDAV and in iCloud Drive.
+  var folders = Set<String>()
   var writes = 0
   var reads = 0
 
   func list(_ path: String) -> [SyncFolderItem]? {
     let prefix = path + "/"
     let inside = files.filter { $0.key.hasPrefix(prefix) }.sorted { $0.key < $1.key }
-    if inside.isEmpty { return nil }
+    if inside.isEmpty { return folders.contains(path) ? [] : nil }
     var seen = Set<String>()
     var items: [SyncFolderItem] = []
     for (p, v) in inside {
@@ -191,11 +226,20 @@ actor MemoryFolder: SyncFolder {
   func write(_ path: String, data: Data) throws {
     writes += 1
     files[path] = (data, writes)
+    var parts = path.split(separator: "/").dropLast()
+    while !parts.isEmpty {
+      folders.insert(parts.joined(separator: "/"))
+      parts = parts.dropLast()
+    }
   }
 
   func delete(_ path: String) {
     files = files.filter { $0.key != path && !$0.key.hasPrefix(path + "/") }
+    folders = folders.filter { $0 != path && !$0.hasPrefix(path + "/") }
   }
+
+  /// Puts bytes at a path without going through the engine (a damaged or newer-format file).
+  func put(_ path: String, _ text: String) { try? write(path, data: Data(text.utf8)) }
 
   func has(_ path: String) -> Bool { files[path] != nil }
   var isEmpty: Bool { files.isEmpty }
@@ -330,6 +374,47 @@ struct SyncEngineTests {
     try await a.sync()
     #expect(await a.local.books().first?.position == 80)
     #expect(await b.local.books().first?.position == 80)
+  }
+
+  @Test func anUnreadableBookInTheStoreIsNotADeletion() async throws {
+    let store = MemoryFolder()
+    let a = Device(store)
+    let b = Device(store)
+    try await a.local.add(book(), audio: "AUDIO")
+    try await a.local.add(comment("A", "keep me"), to: bookID, audio: "VOICE")
+    try await a.sync()
+    try await b.sync()
+    // a newer app version (or a damaged upload) leaves a book.json this version cannot read
+    await store.put("Books/\(bookID)/book.json", #"{"format": 99}"#)
+    let report = try await b.sync()
+    #expect(report.deleted == 0)
+    #expect(await b.local.books().count == 1)
+    #expect(await b.local.text("\(bookID)/comments/comment-A.m4a") == "VOICE")
+  }
+
+  @Test func aMissingBooksFolderDeletesNothing() async throws {
+    let store = MemoryFolder()
+    let a = Device(store)
+    try await a.local.add(book(), audio: "AUDIO")
+    try await a.sync()
+    // the folder was moved on the server, or iCloud has not filled the container yet
+    await store.delete("Books")
+    let report = try await a.sync()
+    #expect(report.deleted == 0)
+    #expect(await a.local.books().count == 1)
+  }
+
+  @Test func anUnreadableCommentIsNotADeletion() async throws {
+    let store = MemoryFolder()
+    let a = Device(store)
+    let b = Device(store)
+    try await a.local.add(book(), audio: "AUDIO")
+    try await a.local.add(comment("A", "keep me"), to: bookID, audio: "VOICE")
+    try await a.sync()
+    try await b.sync()
+    await store.put("Books/\(bookID)/comments/A.json", "not json")
+    try await b.sync()
+    #expect(await b.local.comments(bookID: bookID).map(\.id) == ["A"])
   }
 
   @Test func deletedBookLeavesTheStoreAndOtherDevices() async throws {

@@ -11,13 +11,15 @@ import java.nio.file.Files
 /** A store in memory: path → bytes, the tag is a write counter. */
 class MemoryFolder : SyncFolder {
     val files = sortedMapOf<String, Pair<ByteArray, Int>>()
+    /** Folders stay when their last file goes, as on WebDAV and in iCloud Drive. */
+    private val folders = HashSet<String>()
     private var writes = 0
     var reads = 0
 
     override suspend fun list(path: String): List<SyncFolder.Item>? {
         val prefix = "$path/"
         val inside = files.filterKeys { it.startsWith(prefix) }
-        if (inside.isEmpty()) return null
+        if (inside.isEmpty()) return if (path in folders) emptyList() else null
         return inside.map { (p, v) ->
             val rest = p.removePrefix(prefix)
             if ('/' in rest) SyncFolder.Item(rest.substringBefore('/'), true, "")
@@ -29,8 +31,16 @@ class MemoryFolder : SyncFolder {
     override suspend fun download(path: String, dest: File) { dest.parentFile.mkdirs(); dest.writeBytes(files.getValue(path).first) }
     override suspend fun write(path: String, size: Long, open: () -> InputStream) {
         files[path] = open().use { it.readBytes() } to ++writes
+        var parent = path.substringBeforeLast('/', "")
+        while (parent.isNotEmpty()) { folders.add(parent); parent = parent.substringBeforeLast('/', "") }
     }
-    override suspend fun delete(path: String) { files.keys.removeIf { it == path || it.startsWith("$path/") } }
+    override suspend fun delete(path: String) {
+        files.keys.removeIf { it == path || it.startsWith("$path/") }
+        folders.removeIf { it == path || it.startsWith("$path/") }
+    }
+
+    /** Puts bytes at a path without going through the engine (a damaged or newer-format file). */
+    suspend fun put(path: String, text: String) { val b = text.encodeToByteArray(); write(path, b.size.toLong()) { b.inputStream() } }
 }
 
 /** A device's library in memory, with its files in a temporary folder. */
@@ -129,6 +139,44 @@ class SyncEngineTests {
         a.sync(); b.sync(); a.sync()
         assertEquals(80.0, a.local.books.getValue(bookId).position, 0.0)
         assertEquals(80.0, b.local.books.getValue(bookId).position, 0.0)
+    }
+
+    @Test fun anUnreadableBookInTheStoreIsNotADeletion() = runTest {
+        val store = MemoryFolder()
+        val a = Device(store)
+        val b = Device(store)
+        a.local.add(book(), audio = "AUDIO")
+        a.local.add(bookId, comment("A", "keep me"), audio = "VOICE")
+        a.sync(); b.sync()
+        // a newer app version (or a damaged upload) leaves a book.json this version cannot read
+        store.put("Books/$bookId/book.json", """{"format": 99}""")
+        val report = b.sync()
+        assertEquals(0, report.deleted)
+        assertEquals(1, b.local.books.size)
+        assertEquals("VOICE", File(b.local.dir, "$bookId/comments/comment-A.m4a").readText())
+    }
+
+    @Test fun aMissingBooksFolderDeletesNothing() = runTest {
+        val store = MemoryFolder()
+        val a = Device(store)
+        a.local.add(book(), audio = "AUDIO")
+        a.sync()
+        // the folder was moved on the server
+        store.delete("Books")
+        assertEquals(0, a.sync().deleted)
+        assertEquals(1, a.local.books.size)
+    }
+
+    @Test fun anUnreadableCommentIsNotADeletion() = runTest {
+        val store = MemoryFolder()
+        val a = Device(store)
+        val b = Device(store)
+        a.local.add(book(), audio = "AUDIO")
+        a.local.add(bookId, comment("A", "keep me"), audio = "VOICE")
+        a.sync(); b.sync()
+        store.put("Books/$bookId/comments/A.json", "not json")
+        b.sync()
+        assertEquals(setOf("A"), b.local.comments.getValue(bookId).keys)
     }
 
     @Test fun deletedBookLeavesTheStoreAndOtherDevices() = runTest {
